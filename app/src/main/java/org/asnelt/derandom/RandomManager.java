@@ -26,36 +26,96 @@ public class RandomManager {
     protected static final String[] LCG_NAMES = {
             "LCG: Java",
             "LCG: Numerical Recipes",
+            "LCG: Borland C++ rand()",
+            "LCG: Borland C++ lrand()",
             "LCG: glibc",
+            "LCG: glibc revised",
             "LCG: ANSI C",
+            "LCG: C99/C11",
+            "LCG: Borland Delphi",
+            "LCG: Microsoft Visual C++",
+            "LCG: Microsoft Visual Basic",
+            "LCG: Native API",
+            "LCG: MINSTD",
+            "LCG: MINSTD revised",
+            "LCG: Sinclair ZX81",
+            "LCG: RANF",
             "LCG: RANDU"
     };
     /** Multipliers of all linear congruential generators. */
     protected static final long[] LCG_MULTIPLIERS = {
             25214903917L,
             1664525L,
+            22695477L,
+            22695477L,
+            69069L,
             1103515245L,
             1103515245L,
+            1103515245L,
+            134775813L,
+            214013L,
+            1140671485L,
+            2147483629L,
+            16807L,
+            48271L,
+            75L,
+            44485709377909L,
             65539L
     };
     /** Increments of all linear congruential generators. */
     protected static final long[] LCG_INCREMENTS = {
             11L,
             1013904223L,
+            1L,
+            1L,
+            1L,
             12345L,
             12345L,
+            12345L,
+            1L,
+            2531011L,
+            12820163L,
+            2147483587L,
+            0L,
+            0L,
+            0L,
+            0L,
             0L
     };
     /** Moduli of all linear congruential generators. */
     protected static final long[] LCG_MODULI = {
             281474976710656L,
             4294967296L,
+            4294967296L,
+            4294967296L,
+            4294967296L,
             2147483648L,
             2147483648L,
+            4294967296L,
+            4294967296L,
+            4294967296L,
+            16777216L,
+            2147483647L,
+            2147483647L,
+            2147483647L,
+            65537L,
+            281474976710656L,
             2147483648L
     };
     /** Seeds of all linear congruential generators. */
     protected static final long[] LCG_SEEDS = {
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
             0L,
             0L,
             0L,
@@ -66,8 +126,20 @@ public class RandomManager {
     protected static final int[] LCG_BIT_RANGE_STARTS = {
             16,
             0,
+            16,
+            0,
+            0,
             0,
             16,
+            16,
+            32,
+            16,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
             0
     };
     /** Indices of stop bits for output of all linear congruential generators. */
@@ -76,6 +148,18 @@ public class RandomManager {
             31,
             30,
             30,
+            31,
+            30,
+            30,
+            30,
+            63,
+            30,
+            23,
+            30,
+            30,
+            30,
+            16,
+            47,
             30
     };
     /** Index of currently active generator. */
