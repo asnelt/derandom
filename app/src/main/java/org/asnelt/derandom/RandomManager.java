@@ -24,87 +24,82 @@ public class RandomManager {
     protected RandomNumberGenerator[] generators;
     /** Names of all linear congruential generators. */
     protected static final String[] LCG_NAMES = {
-            "LCG: Java",
-            "LCG: Numerical Recipes",
-            "LCG: Borland C++ rand()",
+            "LCG: ANSI C",
             "LCG: Borland C++ lrand()",
+            "LCG: Borland C++ rand()",
+            "LCG: C99/C11",
             "LCG: glibc",
             "LCG: glibc revised",
-            "LCG: ANSI C",
-            "LCG: C99/C11",
-            "LCG: Borland Delphi",
-            "LCG: Microsoft Visual C++",
+            "LCG: Java",
             "LCG: Microsoft Visual Basic",
-            "LCG: Native API",
+            "LCG: Microsoft Visual C++",
             "LCG: MINSTD",
             "LCG: MINSTD revised",
-            "LCG: Sinclair ZX81",
+            "LCG: Native API",
+            "LCG: Numerical Recipes",
+            "LCG: RANDU",
             "LCG: RANF",
-            "LCG: RANDU"
+            "LCG: Sinclair ZX81"
     };
     /** Multipliers of all linear congruential generators. */
     protected static final long[] LCG_MULTIPLIERS = {
-            25214903917L,
-            1664525L,
+            1103515245L,
             22695477L,
             22695477L,
+            1103515245L,
             69069L,
             1103515245L,
-            1103515245L,
-            1103515245L,
-            134775813L,
-            214013L,
+            25214903917L,
             1140671485L,
-            2147483629L,
+            214013L,
             16807L,
             48271L,
-            75L,
+            2147483629L,
+            1664525L,
+            65539L,
             44485709377909L,
-            65539L
+            75L
     };
     /** Increments of all linear congruential generators. */
     protected static final long[] LCG_INCREMENTS = {
+            12345L,
+            1L,
+            1L,
+            12345L,
+            1L,
+            12345L,
             11L,
-            1013904223L,
-            1L,
-            1L,
-            1L,
-            12345L,
-            12345L,
-            12345L,
-            1L,
-            2531011L,
             12820163L,
+            2531011L,
+            0L,
+            0L,
             2147483587L,
-            0L,
-            0L,
+            1013904223L,
             0L,
             0L,
             0L
     };
     /** Moduli of all linear congruential generators. */
     protected static final long[] LCG_MODULI = {
+            2147483648L,
+            4294967296L,
+            4294967296L,
+            4294967296L,
+            4294967296L,
+            2147483648L,
             281474976710656L,
-            4294967296L,
-            4294967296L,
-            4294967296L,
-            4294967296L,
-            2147483648L,
-            2147483648L,
-            4294967296L,
-            4294967296L,
-            4294967296L,
             16777216L,
+            4294967296L,
             2147483647L,
             2147483647L,
             2147483647L,
-            65537L,
+            4294967296L,
+            2147483648L,
             281474976710656L,
-            2147483648L
+            65537L
     };
     /** Seeds of all linear congruential generators. */
     protected static final long[] LCG_SEEDS = {
-            0L,
             0L,
             0L,
             0L,
@@ -127,12 +122,11 @@ public class RandomManager {
             16,
             0,
             16,
-            0,
+            16,
             0,
             0,
             16,
-            16,
-            32,
+            0,
             16,
             0,
             0,
@@ -144,26 +138,27 @@ public class RandomManager {
     };
     /** Indices of stop bits for output of all linear congruential generators. */
     protected static final int[] LCG_BIT_RANGE_STOPS = {
+            30,
+            30,
+            30,
+            30,
+            31,
+            30,
             47,
-            31,
-            30,
-            30,
-            31,
-            30,
-            30,
-            30,
-            63,
-            30,
             23,
             30,
             30,
             30,
-            16,
+            30,
+            31,
+            30,
             47,
-            30
+            16
     };
     /** Index of currently active generator. */
     protected int currentGenerator;
+    /** Best prediction for the latest incoming numbers. */
+    protected long[] incomingPredictionNumbers;
 
     /**
      * Constructor initializing all random numbers generators.
@@ -172,6 +167,7 @@ public class RandomManager {
         this.generators = new RandomNumberGenerator[0];
         initLinearCongruentialGenerators();
         this.currentGenerator = 0;
+        incomingPredictionNumbers = new long[0];
     }
 
     /**
@@ -260,17 +256,18 @@ public class RandomManager {
 
     /**
      * Find prediction numbers of the currently active generator that match the input series and
-     * update the state accordingly.
+     * update the state and incomingPredictionNumbers accordingly.
      * @param incomingNumbers new input numbers
      * @param historyNumbers previous input numbers
-     * @return predicted numbers that best match input series
      */
-    public long[] findCurrentSeries(long[] incomingNumbers, long[] historyNumbers) {
-        return generators[currentGenerator].findSeries(incomingNumbers, historyNumbers);
+    public void findCurrentSeries(long[] incomingNumbers, long[] historyNumbers) {
+        incomingPredictionNumbers =
+                generators[currentGenerator].findSeries(incomingNumbers, historyNumbers);
     }
 
     /**
-     * Detect best matching random number generator from input numbers.
+     * Detect best matching random number generator from input numbers, update the state and
+     * update incomingPredictionNumbers with the current prediction.
      * @param incomingNumbers new input numbers
      * @param historyNumbers previous input numbers
      * @return index of the best matching generator
@@ -279,8 +276,6 @@ public class RandomManager {
         // Evaluate prediction quality for all generators
         int bestScore = 0;
         int bestGenerator = currentGenerator;
-        // Save state for later restoration
-        long[] state = getCompleteState();
         for (int i = 0; i < generators.length; i++) {
             long[] prediction = generators[i].findSeries(incomingNumbers, historyNumbers);
             int score = 0;
@@ -290,13 +285,27 @@ public class RandomManager {
                 }
             }
             if (score > bestScore) {
+                bestScore = score;
                 bestGenerator = i;
             }
+            if (i == currentGenerator) {
+                if (score == bestScore) {
+                    // For equal score current generator is the default generator
+                    bestGenerator = currentGenerator;
+                }
+                incomingPredictionNumbers = prediction;
+            }
         }
-        setCompleteState(state);
         return bestGenerator;
     }
 
+    /**
+     * Returns the best prediction for the latest incoming numbers.
+     * @return prediction for latest incoming numbers
+     */
+    public long[] getIncomingPredictionNumbers() {
+        return incomingPredictionNumbers;
+    }
     /**
      * Returns the complete state of the random manager for later recovery.
      * @return the complete state

@@ -16,12 +16,16 @@
 
 package org.asnelt.derandom;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.text.InputType;
+import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
@@ -29,6 +33,8 @@ import android.widget.TextView;
  * generator.
  */
 public class DisplayParametersActivity extends ActionBarActivity {
+    /** Main ScrollView. */
+    protected ScrollView scrollViewParameters;
     /** Field for generator name. */
     protected TextView textGeneratorName;
     /** Layout of the activity. */
@@ -45,8 +51,10 @@ public class DisplayParametersActivity extends ActionBarActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Initialize layout
-        setContentView(R.layout.activity_display_parameters);
+        LayoutInflater inflater = getLayoutInflater();
+        @SuppressLint("InflateParams")
+        View view = inflater.inflate(R.layout.activity_display_parameters, null);
+
         // Extract parameters and names from bundle
         Bundle extras = getIntent().getExtras();
         String name = extras.getString(MainActivity.EXTRA_GENERATOR_NAME);
@@ -54,11 +62,15 @@ public class DisplayParametersActivity extends ActionBarActivity {
                 extras.getStringArray(MainActivity.EXTRA_GENERATOR_PARAMETER_NAMES);
         long[] parameters = extras.getLongArray(MainActivity.EXTRA_GENERATOR_PARAMETERS);
 
-        textGeneratorName = (TextView)findViewById(R.id.text_generator_name);
-        textGeneratorName.setText(name);
-
+        scrollViewParameters = (ScrollView) view.findViewById(R.id.scroll_view_parameters);
         // Add layout
-        layoutParameters = (LinearLayout)findViewById(R.id.layout_parameters);
+        layoutParameters = new LinearLayout(this);
+        layoutParameters.setOrientation(LinearLayout.VERTICAL);
+
+        textGeneratorName = new TextView(this);
+        textGeneratorName.setText(name);
+        layoutParameters.addView(textGeneratorName);
+
         textParameterNames = new TextView[parameterNames.length];
         // Add fields for parameters
         textParameters = new EditText[parameters.length];
@@ -74,6 +86,8 @@ public class DisplayParametersActivity extends ActionBarActivity {
             textParameters[i].setKeyListener(null);
             layoutParameters.addView(textParameters[i]);
         }
+        scrollViewParameters.addView(layoutParameters);
+        setContentView(view);
     }
 
     /**

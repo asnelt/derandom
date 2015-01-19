@@ -76,9 +76,17 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * Sets the state of the generator.
      * @param state the complete state of the generator
      */
+    public void setState(long state) {
+        this.state = state;
+    }
+
+    /**
+     * Sets the state of the generator.
+     * @param state the complete state of the generator
+     */
     @Override
     public void setState(long[] state) {
-        this.state = state[0];
+        setState(state[0]);
     }
 
     /**
@@ -162,17 +170,17 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
         if (predicted[0] != incomingNumbers[0]) {
             if (historyNumbers == null || historyNumbers.length == 0) {
                 // No history present; just guess incoming number as new state
-                setState(incomingNumbers);
+                setState(incomingNumbers[0]);
             } else {
                 // We have a pair to work with
                 int lastIndex = historyNumbers.length - 1;
-                state = findState(historyNumbers[lastIndex], incomingNumbers[0]);
+                setState(findState(historyNumbers[lastIndex], incomingNumbers[0]));
             }
         }
         for (int i = 1; i < incomingNumbers.length; i++) {
             predicted[i] = next();
             if (predicted[i] != incomingNumbers[i]) {
-                state = findState(incomingNumbers[i-1], incomingNumbers[i]);
+                setState(findState(incomingNumbers[i-1], incomingNumbers[i]));
             }
         }
         return predicted;
