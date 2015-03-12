@@ -24,6 +24,11 @@ public abstract class RandomNumberGenerator {
     protected String name;
 
     /**
+     * Resets the generator to its initial state.
+     */
+    public abstract void reset();
+
+    /**
      * Returns the state of the generator for later recovery.
      * @return the complete state of the generator
      */
@@ -57,6 +62,7 @@ public abstract class RandomNumberGenerator {
      * Sets all parameters of the generator.
      * @param parameters all parameters of the generator
      */
+    @SuppressWarnings("unused")
     public abstract void setParameters(long[] parameters);
 
     /**
@@ -69,15 +75,16 @@ public abstract class RandomNumberGenerator {
     /**
      * Find prediction numbers that match the input series and update the state accordingly.
      * @param incomingNumbers new input numbers
-     * @param historyNumbers previous input numbers
+     * @param historyBuffer previous input numbers
      * @return predicted numbers that best match input series
      */
-    public abstract long[] findSeries(long[] incomingNumbers, long[] historyNumbers);
+    public abstract long[] findSeries(long[] incomingNumbers, HistoryBuffer historyBuffer);
 
     /**
      * Generates the next prediction and updates the state accordingly.
      * @return next prediction
      */
+    @SuppressWarnings("unused")
     protected abstract long next();
 
     /**

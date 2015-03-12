@@ -16,30 +16,50 @@
 
 package org.asnelt.derandom;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * This class implements a linear congruential random number generator.
  */
 public class LinearCongruentialGenerator extends RandomNumberGenerator {
-    /** Human readable names of all parameters. */
-    protected static final String[] PARAMETER_NAMES = {
-        "Multiplier", "Increment", "Modulus", "State", "Bit range start", "Bit range stop"
-    };
     /** Multiplier parameter. */
-    protected long multiplier;
+    private long multiplier;
+    /** Human readable name of multiplier parameter. */
+    private static final String MULTIPLIER_NAME = "Multiplier";
     /** Increment parameter. */
-    protected long increment;
+    private long increment;
+    /** Human readable name of increment parameter. */
+    private static final String INCREMENT_NAME = "Increment";
     /** Modulus parameter. */
-    protected long modulus;
+    private long modulus;
+    /** Human readable name of modulus parameter. */
+    private static final String MODULUS_NAME = "Modulus";
     /** State parameter. */
-    protected long state;
+    private long state;
+    /** Human readable name of state parameter. */
+    private static final String STATE_NAME = "State";
     /** Index of start bit for output. */
     private int bitRangeStart;
+    /** Human readable name of bit range start parameter. */
+    private static final String BIT_RANGE_START_NAME = "Bit range start";
     /** Index of stop bit for output. */
     private int bitRangeStop;
+    /** Human readable name of bit range stop parameter. */
+    private static final String BIT_RANGE_STOP_NAME = "Bit range stop";
+    /** Human readable names of all free parameters. */
+    private static final String[] PARAMETER_NAMES = {
+        MULTIPLIER_NAME, INCREMENT_NAME, MODULUS_NAME, STATE_NAME, BIT_RANGE_START_NAME,
+            BIT_RANGE_STOP_NAME
+    };
+    /** The parameter names as a list. */
+    private static final List PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
     /** Bit mask based on bit range. */
     private long mask;
     /** Index of most significant modulus bit. */
     private int modulusBitRangeStop;
+    /** Initial seed of the generator. */
+    private long initialSeed;
 
     /**
      * Constructor initializing all parameters.
@@ -57,8 +77,17 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
         this.multiplier = multiplier;
         this.increment = increment;
         setModulus(modulus);
+        this.initialSeed = seed;
         this.state = seed;
         setBitRange(bitRangeStart, bitRangeStop);
+    }
+
+    /**
+     * Resets the generator to its initial seed.
+     */
+    @Override
+    public void reset() {
+        setState(initialSeed);
     }
 
     /**
@@ -111,13 +140,13 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      */
     @Override
     public long[] getParameters() {
-        long[] parameters = new long[6];
-        parameters[0] = multiplier;
-        parameters[1] = increment;
-        parameters[2] = modulus;
-        parameters[3] = state;
-        parameters[4] = (long) bitRangeStart;
-        parameters[5] = (long) bitRangeStop;
+        long[] parameters = new long[PARAMETER_NAMES_LIST.size()];
+        parameters[PARAMETER_NAMES_LIST.indexOf(MULTIPLIER_NAME)] = multiplier;
+        parameters[PARAMETER_NAMES_LIST.indexOf(INCREMENT_NAME)] = increment;
+        parameters[PARAMETER_NAMES_LIST.indexOf(MODULUS_NAME)] = modulus;
+        parameters[PARAMETER_NAMES_LIST.indexOf(STATE_NAME)] = state;
+        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_START_NAME)] = (long) bitRangeStart;
+        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_STOP_NAME)] = (long) bitRangeStop;
         return parameters;
     }
 
@@ -127,11 +156,12 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      */
     @Override
     public void setParameters(long[] parameters) {
-        this.multiplier = parameters[0];
-        this.increment = parameters[1];
-        setModulus(parameters[2]);
-        this.state = parameters[3];
-        setBitRange((int) parameters[4], (int) parameters[5]);
+        this.multiplier = parameters[PARAMETER_NAMES_LIST.indexOf(MULTIPLIER_NAME)];
+        this.increment = parameters[PARAMETER_NAMES_LIST.indexOf(INCREMENT_NAME)];
+        setModulus(parameters[PARAMETER_NAMES_LIST.indexOf(MODULUS_NAME)]);
+        this.state = parameters[PARAMETER_NAMES_LIST.indexOf(STATE_NAME)];
+        setBitRange((int) parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_START_NAME)],
+                (int) parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_STOP_NAME)]);
     }
 
     /**
@@ -155,11 +185,11 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
     /**
      * Find prediction numbers that match the input series and update the state accordingly.
      * @param incomingNumbers new input numbers
-     * @param historyNumbers previous input numbers
+     * @param historyBuffer previous input numbers
      * @return predicted numbers that best match input series
      */
     @Override
-    public long[] findSeries(long[] incomingNumbers, long[] historyNumbers) {
+    public long[] findSeries(long[] incomingNumbers, HistoryBuffer historyBuffer) {
         long[] predicted = new long[incomingNumbers.length];
         if (incomingNumbers.length == 0) {
             // Empty input
@@ -168,13 +198,12 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
         // Make prediction based on current state
         predicted[0] = next();
         if (predicted[0] != incomingNumbers[0]) {
-            if (historyNumbers == null || historyNumbers.length == 0) {
+            if (historyBuffer == null || historyBuffer.length() == 0) {
                 // No history present; just guess incoming number as new state
                 setState(incomingNumbers[0]);
             } else {
                 // We have a pair to work with
-                int lastIndex = historyNumbers.length - 1;
-                setState(findState(historyNumbers[lastIndex], incomingNumbers[0]));
+                setState(findState(historyBuffer.getLast(), incomingNumbers[0]));
             }
         }
         for (int i = 1; i < incomingNumbers.length; i++) {
@@ -202,7 +231,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @param successor next output of the generator
      * @return the state of the generator after the successor value
      */
-    protected long findState(long number, long successor) {
+    private long findState(long number, long successor) {
         // Undo output shift
         number <<= bitRangeStart;
         // Number of leading bits that are hidden
@@ -230,7 +259,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @param state the state for calculating the output
      * @return the output of the generator
      */
-    protected long calculateOutput(long state) {
+    private long calculateOutput(long state) {
         return (state & mask) >> bitRangeStart;
     }
 
@@ -239,7 +268,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @param state the base state for calculating the successor state
      * @return the next state of the generator
      */
-    protected long nextState(long state) {
+    private long nextState(long state) {
         return (multiplier * state + increment) % modulus;
     }
 
@@ -247,7 +276,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * Sets the modulus parameter and updates an internal variable accordingly.
      * @param modulus new value for modulus
      */
-    protected void setModulus(long modulus) {
+    private void setModulus(long modulus) {
         if (modulus == 0L) {
             throw new IllegalArgumentException("modulus must not be zero");
         }
@@ -260,7 +289,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @param start new value for bitRangeStart
      * @param stop new value for bitRangeStop
      */
-    protected void setBitRange(int start, int stop) {
+    private void setBitRange(int start, int stop) {
         // Check index range
         if (start < 0) {
             throw new IllegalArgumentException(

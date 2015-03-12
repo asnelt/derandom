@@ -85,7 +85,7 @@ limitations under the License.
         android:layout_marginLeft="16dp"
         android:layout_marginStart="16dp" />
 
-    <TextView
+    <org.asnelt.derandom.HistoryView
         android:id="@+id/text_history_input"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
@@ -101,7 +101,7 @@ limitations under the License.
         android:textSize="14sp"
         android:textIsSelectable="true" />
 
-    <TextView
+    <org.asnelt.derandom.HistoryView
         android:id="@+id/text_history_prediction"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"

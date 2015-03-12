@@ -16,13 +16,15 @@
 
 package org.asnelt.derandom;
 
-import android.annotation.SuppressLint;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -33,17 +35,6 @@ import android.widget.TextView;
  * generator.
  */
 public class DisplayParametersActivity extends ActionBarActivity {
-    /** Main ScrollView. */
-    protected ScrollView scrollViewParameters;
-    /** Field for generator name. */
-    protected TextView textGeneratorName;
-    /** Layout of the activity. */
-    protected LinearLayout layoutParameters;
-    /** Fields of the parameter names. */
-    protected TextView[] textParameterNames;
-    /** Fields of the parameters. */
-    protected EditText[] textParameters;
-
     /**
      * Initializes the activity by adding elements for all generator parameters.
      * @param savedInstanceState Bundle containing all parameters and parameter names
@@ -52,8 +43,8 @@ public class DisplayParametersActivity extends ActionBarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         LayoutInflater inflater = getLayoutInflater();
-        @SuppressLint("InflateParams")
-        View view = inflater.inflate(R.layout.activity_display_parameters, null);
+        ViewGroup rootView = (ViewGroup) getWindow().getDecorView().getRootView();
+        View view = inflater.inflate(R.layout.activity_display_parameters, rootView, false);
 
         // Extract parameters and names from bundle
         Bundle extras = getIntent().getExtras();
@@ -62,25 +53,39 @@ public class DisplayParametersActivity extends ActionBarActivity {
                 extras.getStringArray(MainActivity.EXTRA_GENERATOR_PARAMETER_NAMES);
         long[] parameters = extras.getLongArray(MainActivity.EXTRA_GENERATOR_PARAMETERS);
 
-        scrollViewParameters = (ScrollView) view.findViewById(R.id.scroll_view_parameters);
+        ScrollView scrollViewParameters = (ScrollView) view.findViewById(
+                R.id.scroll_view_parameters);
         // Add layout
-        layoutParameters = new LinearLayout(this);
+        LinearLayout layoutParameters = new LinearLayout(this);
         layoutParameters.setOrientation(LinearLayout.VERTICAL);
 
-        textGeneratorName = new TextView(this);
+        TextView textGeneratorName = new TextView(this);
         textGeneratorName.setText(name);
         layoutParameters.addView(textGeneratorName);
 
-        textParameterNames = new TextView[parameterNames.length];
+        // Get auto-detect settings
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        String parameterBase = sharedPreferences.getString(SettingsActivity.KEY_PREF_PARAMETER_BASE, "");
+
+        TextView[] textParameterNames = new TextView[parameterNames.length];
         // Add fields for parameters
-        textParameters = new EditText[parameters.length];
+        EditText[] textParameters = new EditText[parameters.length];
         for (int i = 0; i < parameterNames.length; i++) {
             textParameterNames[i] = new TextView(this);
             textParameterNames[i].setText(parameterNames[i]);
             layoutParameters.addView(textParameterNames[i]);
 
             textParameters[i] = new EditText(this);
-            textParameters[i].setText(Long.toString(parameters[i]));
+            switch (parameterBase) {
+                case "8":
+                    textParameters[i].setText("0" + Long.toOctalString(parameters[i]));
+                    break;
+                case "16":
+                    textParameters[i].setText("0x" + Long.toHexString(parameters[i]));
+                    break;
+                default:
+                    textParameters[i].setText(Long.toString(parameters[i]));
+            }
             textParameters[i].setInputType(InputType.TYPE_CLASS_NUMBER);
             // Remove the following line to make fields editable
             textParameters[i].setKeyListener(null);

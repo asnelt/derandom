@@ -21,16 +21,12 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.text.InputType;
-import android.text.Spannable;
-import android.text.SpannableString;
 import android.text.method.ScrollingMovementMethod;
-import android.text.style.ForegroundColorSpan;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -44,6 +40,7 @@ import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 
@@ -51,7 +48,8 @@ import java.io.IOException;
  * This class implements the main activity. It contains the main input output elements and triggers
  * the calculation of predictions.
  */
-public class MainActivity extends ActionBarActivity implements OnItemSelectedListener {
+public class MainActivity extends ActionBarActivity implements OnItemSelectedListener,
+        HistoryViewListener {
     /** Extra string identifier for generator name. */
     public final static String EXTRA_GENERATOR_NAME = "org.asnelt.derandom.GENERATOR_NAME";
     /** Extra string identifier for generator parameter names. */
@@ -62,47 +60,43 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
             "org.asnelt.derandom.GENERATOR_PARAMETERS";
 
     /** Key to recover history number variables. */
-    protected final static String STATE_HISTORY_NUMBERS = "keyHistoryNumbers";
+    private final static String STATE_HISTORY_NUMBERS = "keyHistoryNumbers";
     /** Key to recover history prediction variables. */
-    protected final static String STATE_HISTORY_PREDICTION = "keyHistoryPrediction";
+    private final static String STATE_HISTORY_PREDICTION = "keyHistoryPrediction";
     /** Key to recover predictions. */
-    protected final static String STATE_PREDICTION = "keyPrediction";
+    private final static String STATE_PREDICTION = "keyPrediction";
     /** Key to recover the random manager. */
-    protected final static String STATE_RANDOM_MANAGER = "keyRandomManager";
+    private final static String STATE_RANDOM_MANAGER = "keyRandomManager";
     /** Key to recover the file URI. */
-    protected final static String STATE_FILE_URI = "keyFileUri";
+    private final static String STATE_FILE_URI = "keyFileUri";
 
     /** Request code for input files. */
-    protected static final int FILE_REQUEST_CODE = 0;
+    private static final int FILE_REQUEST_CODE = 0;
     /** MIME type for input files. */
-    protected static final String FILE_MIME_TYPE = "text/plain";
+    private static final String FILE_MIME_TYPE = "text/plain";
     /** spinnerInput item position of direct input selection. */
-    protected static final int INDEX_DIRECT_INPUT = 0;
+    private static final int INDEX_DIRECT_INPUT = 0;
     /** spinnerInput item position of file input selection. */
-    protected static final int INDEX_FILE_INPUT = 1;
+    private static final int INDEX_FILE_INPUT = 1;
 
-    /** Numbers that were previously entered as input. */
-    protected long[] historyNumbers;
-    /** Numbers that were previously predicted. */
-    protected long[] historyPredictionNumbers;
     /** Field for displaying previously entered numbers. */
-    protected TextView textHistoryInput;
+    private HistoryView textHistoryInput;
     /** Field for displaying predictions for previous numbers. */
-    protected TextView textHistoryPrediction;
+    private HistoryView textHistoryPrediction;
     /** Field for displaying predictions. */
-    protected TextView textPrediction;
+    private TextView textPrediction;
     /** Field for entering input. */
-    protected EditText textInput;
+    private EditText textInput;
     /** Spinner for selecting the input method. */
-    protected Spinner spinnerInput;
+    private Spinner spinnerInput;
     /** Spinner for selecting and displaying the current generator. */
-    protected Spinner spinnerGenerator;
+    private Spinner spinnerGenerator;
     /** Random manager for generating predictions. */
-    protected RandomManager randomManager;
+    private RandomManager randomManager;
     /** Current input file for reading numbers. */
-    protected File inputFile;
+    private File inputFile;
     /** Reader for reading input numbers. */
-    protected BufferedReader inputReader;
+    private BufferedReader inputReader;
 
     /**
      * Initializes this activity and eventually recovers its state.
@@ -114,8 +108,10 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
         setContentView(R.layout.activity_main);
         PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
 
-        textHistoryInput = (TextView) findViewById(R.id.text_history_input);
-        textHistoryPrediction = (TextView) findViewById(R.id.text_history_prediction);
+        textHistoryInput = (HistoryView) findViewById(R.id.text_history_input);
+        textHistoryInput.setHistoryViewListener(this);
+        textHistoryPrediction = (HistoryView) findViewById(R.id.text_history_prediction);
+        textHistoryPrediction.setHistoryViewListener(this);
         textPrediction = (TextView) findViewById(R.id.text_prediction);
         textInput = (EditText) findViewById(R.id.text_input);
         spinnerInput = (Spinner) findViewById(R.id.spinner_input);
@@ -131,27 +127,47 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
 
         randomManager = new RandomManager();
 
+        // Apply history length preference
+        int historyLength = getLengthPreference(SettingsActivity.KEY_PREF_HISTORY_LENGTH);
+        textHistoryInput.setCapacity(historyLength);
+        textHistoryPrediction.setCapacity(historyLength);
+        // Apply color preference
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        if (sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_COLORED_PAST, false)) {
+            textHistoryPrediction.enableColor(null);
+        }
+
         // Eventually recover state
         if (savedInstanceState == null) {
-            historyNumbers = new long[0];
-            historyPredictionNumbers = new long[0];
             inputFile = null;
             inputReader = null;
         } else {
-            historyNumbers = savedInstanceState.getLongArray(STATE_HISTORY_NUMBERS);
-            appendNumbers(historyNumbers, textHistoryInput);
-            historyPredictionNumbers = savedInstanceState.getLongArray(STATE_HISTORY_PREDICTION);
-            appendColoredNumbers(historyPredictionNumbers, textHistoryPrediction, historyNumbers);
+            long[] historyNumbers = savedInstanceState.getLongArray(STATE_HISTORY_NUMBERS);
+            textHistoryInput.appendNumbers(historyNumbers);
+            textHistoryInput.scrollTo(0, textHistoryInput.getBottom());
+            long[] historyPredictionNumbers = savedInstanceState.getLongArray(
+                    STATE_HISTORY_PREDICTION);
+            textHistoryPrediction.appendNumbers(historyPredictionNumbers, historyNumbers);
+            textHistoryPrediction.scrollTo(0, textHistoryPrediction.getBottom());
             textPrediction.setText(savedInstanceState.getString(STATE_PREDICTION));
+            textPrediction.scrollTo(0, 0);
             long[] randomManagerState = savedInstanceState.getLongArray(STATE_RANDOM_MANAGER);
             randomManager.setCompleteState(randomManagerState);
             String fileString = savedInstanceState.getString(STATE_FILE_URI);
             if (fileString == null || fileString.length() == 0) {
+                // Direct input
                 inputFile = null;
                 inputReader = null;
             } else {
+                // Open input file
                 Uri fileUri = Uri.parse(fileString);
-                processInputFile(fileUri);
+                inputFile = new File(fileUri.getPath());
+                try {
+                    inputReader = new BufferedReader(new FileReader(inputFile));
+                    disableDirectInput();
+                } catch (FileNotFoundException e) {
+                    abortFileInput();
+                }
             }
         }
 
@@ -190,7 +206,21 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
         // Save the current state
+        HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
+        long[] historyNumbers;
+        if (historyBuffer == null) {
+            historyNumbers = new long[0];
+        } else {
+            historyNumbers = historyBuffer.toArray();
+        }
         savedInstanceState.putLongArray(STATE_HISTORY_NUMBERS, historyNumbers);
+        HistoryBuffer historyPredictionBuffer = textHistoryPrediction.getBuffer();
+        long[] historyPredictionNumbers;
+        if (historyPredictionBuffer == null) {
+            historyPredictionNumbers = new long[0];
+        } else {
+            historyPredictionNumbers = historyPredictionBuffer.toArray();
+        }
         savedInstanceState.putLongArray(STATE_HISTORY_PREDICTION, historyPredictionNumbers);
         savedInstanceState.putString(STATE_PREDICTION, textPrediction.getText().toString());
         long[] randomManagerState = randomManager.getCompleteState();
@@ -204,13 +234,41 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     }
 
     /**
+     * Updates everything that is affected by settings changes.
+     */
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Check history length
+        int historyLength = getLengthPreference(SettingsActivity.KEY_PREF_HISTORY_LENGTH);
+        textHistoryInput.setCapacity(historyLength);
+        textHistoryPrediction.setCapacity(historyLength);
+        // Check color
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean coloredPast = sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_COLORED_PAST,
+                false);
+        if (coloredPast != textHistoryPrediction.isColored()) {
+            if (coloredPast) {
+                HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
+                if (historyBuffer != null) {
+                    textHistoryPrediction.enableColor(historyBuffer.toArray());
+                } else {
+                    textHistoryPrediction.enableColor(null);
+                }
+            } else {
+                textHistoryPrediction.disableColor();
+            }
+        }
+        updatePrediction();
+    }
+
+    /**
      * Callback method for creation of options menu.
      * @param menu the menu to inflate
      * @return true if successful
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         return true;
     }
@@ -222,9 +280,6 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         switch (item.getItemId()) {
             case R.id.action_refresh:
                 processInput();
@@ -282,12 +337,16 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
             if (randomManager.getCurrentGenerator() != pos) {
                 // Process complete history
                 randomManager.setCurrentGenerator(pos);
-                if (historyNumbers.length > 0) {
+                HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
+                if (historyBuffer != null && historyBuffer.length() > 0) {
+                    long[] historyNumbers = historyBuffer.toArray();
+                    randomManager.resetCurrentGenerator();
                     randomManager.findCurrentSeries(historyNumbers, null);
-                    historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
-                    textHistoryPrediction.setText("");
-                    appendColoredNumbers(historyPredictionNumbers, textHistoryPrediction,
-                            historyNumbers);
+                    textHistoryPrediction.clear();
+                    long[] historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
+                    textHistoryPrediction.appendNumbers(historyPredictionNumbers, historyNumbers);
+                    textHistoryPrediction.scrollTo(0,
+                            textHistoryPrediction.getLayout().getHeight());
                     updatePrediction();
                 }
             }
@@ -303,10 +362,46 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     }
 
     /**
+     * Called in response to a scroll event.
+     * @param view the origin of the scroll event
+     * @param horizontal current horizontal scroll origin
+     * @param vertical current vertical scroll origin
+     * @param oldHorizontal old horizontal scroll origin
+     * @param oldVertical old vertical scroll origin
+     */
+    public void onScrollChanged(HistoryView view, int horizontal, int vertical, int oldHorizontal,
+                                int oldVertical) {
+        if (view == textHistoryInput) {
+            textHistoryPrediction.scrollTo(horizontal, vertical);
+        } else {
+            textHistoryInput.scrollTo(horizontal, vertical);
+        }
+    }
+
+    /**
+     * Processes the result of the input file selection activity.
+     * @param requestCode the request code of the activity result
+     * @param resultCode the result code of the activity result
+     * @param data contains the input file URI if the request was successful
+     */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILE_REQUEST_CODE) {
+            if (resultCode == RESULT_OK) {
+                Uri fileUri = data.getData();
+                processInputFile(fileUri);
+            } else {
+                abortFileInput();
+            }
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    /**
      * Processes all inputs and calculates a prediction. Called when the user clicks the refresh
      * item.
      */
-    public void processInput() {
+    private void processInput() {
         String input = "";
         try {
             if (inputReader == null) {
@@ -338,16 +433,19 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
                     return;
                 }
             }
-            processInputString(input);
+            try {
+                processInputString(input);
+            } catch (NumberFormatException e) {
+                String errorMessage = getResources().getString(R.string.number_error_message);
+                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+            }
             if (inputReader == null) {
                 textInput.setText("");
             }
         } catch (OutOfMemoryError e) {
             // Abort input processing and reset history and input
-            historyNumbers = new long[0];
-            textHistoryInput.setText("");
-            historyPredictionNumbers = new long[0];
-            textHistoryPrediction.setText("");
+            textHistoryInput.clear();
+            textHistoryPrediction.clear();
             String errorMessage = getResources().getString(R.string.memory_error_message);
             Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
         }
@@ -357,67 +455,51 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
      * Processes an input string of newline separated integers and calculates a prediction.
      * @param input the input string to be processed
      */
-    public void processInputString(String input) {
+    private void processInputString(String input) throws NumberFormatException {
         String[] stringNumbers = input.split("\n");
         long[] inputNumbers = new long[stringNumbers.length];
 
         // Parse numbers
         for (int i = 0; i < inputNumbers.length; i++) {
-            try {
-                inputNumbers[i] = Long.parseLong(stringNumbers[i]);
-            } catch (NumberFormatException e) {
-                // Clear input and return
-                if (inputReader == null) {
-                    textInput.setText("");
-                }
-                String errorMessage = getResources().getString(R.string.number_error_message);
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-                return;
-            }
+            inputNumbers[i] = Long.parseLong(stringNumbers[i]);
         }
 
+        HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
         // Generate new prediction with updating the state
         long[] nextHistoryPredictionNumbers = null;
         boolean changedGenerator = false;
         // Get auto-detect settings
-        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
-        boolean autoDetect = sharedPref.getBoolean("pref_auto_detect", false);
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean autoDetect = sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_AUTO_DETECT,
+                false);
         if (autoDetect) {
             // Detect best generator and update all states
-            int bestGenerator = randomManager.detectGenerator(inputNumbers, historyNumbers);
+            int bestGenerator = randomManager.detectGenerator(inputNumbers, historyBuffer);
             nextHistoryPredictionNumbers = randomManager.getIncomingPredictionNumbers();
             if (bestGenerator != randomManager.getCurrentGenerator()) {
-                // Update spinner and thereby historyPredictionNumbers
+                // Update spinner and thereby historyPredictionBuffer
                 spinnerGenerator.setSelection(bestGenerator);
                 changedGenerator = true;
             }
         }
         if (!autoDetect || changedGenerator) {
-            randomManager.findCurrentSeries(inputNumbers, historyNumbers);
+            randomManager.findCurrentSeries(inputNumbers, historyBuffer);
             nextHistoryPredictionNumbers = randomManager.getIncomingPredictionNumbers();
         }
 
-        appendColoredNumbers(nextHistoryPredictionNumbers, textHistoryPrediction, inputNumbers);
-        // Add new prediction numbers to history prediction
-        historyPredictionNumbers = concatenateNumbers(historyPredictionNumbers,
-                nextHistoryPredictionNumbers);
-
-        // Add new numbers to history
-        historyNumbers = concatenateNumbers(historyNumbers, inputNumbers);
+        // Appends input numbers to history
+        textHistoryInput.appendNumbers(inputNumbers);
+        textHistoryPrediction.appendNumbers(nextHistoryPredictionNumbers, inputNumbers);
 
         updatePrediction();
-
-        appendNumbers(inputNumbers, textHistoryInput);
     }
 
     /**
      * Clears all inputs and predictions. Called when the user clicks the discard item.
      */
-    protected void clearInput() {
-        historyNumbers = new long[0];
-        textHistoryInput.setText("");
-        historyPredictionNumbers = new long[0];
-        textHistoryPrediction.setText("");
+    private void clearInput() {
+        textHistoryInput.clear();
+        textHistoryPrediction.clear();
         textPrediction.setText("");
         randomManager = new RandomManager();
         randomManager.setCurrentGenerator(spinnerGenerator.getSelectedItemPosition());
@@ -430,7 +512,7 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     /**
      * Show generator parameters in a new activity. Called when the user clicks the parameters item.
      */
-    protected void openParameters() {
+    private void openParameters() {
         String name = randomManager.getCurrentGeneratorName();
         String[] parameterNames = randomManager.getCurrentParameterNames();
         long[] parameters = randomManager.getCurrentParameters();
@@ -446,7 +528,7 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     /**
      * Called when the user clicks the settings item.
      */
-    protected void openSettings() {
+    private void openSettings() {
         // Start new settings activity
         Intent intent = new Intent(this, SettingsActivity.class);
         startActivity(intent);
@@ -455,7 +537,7 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     /**
      * Opens an about dialog. Called when the user clicks the about item.
      */
-    protected void openAbout() {
+    private void openAbout() {
         // Construct an about dialog
         String versionName;
         try {
@@ -480,91 +562,47 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     /**
      * Calculates a new prediction and displays it in textPrediction.
      */
-    protected void updatePrediction() {
-        // Predict next numbers
+    private void updatePrediction() {
         textPrediction.setText("");
-        // Get settings
-        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
-        String predictionLengthString = sharedPref.getString("pref_predictions_length", "");
-        int predictionLength;
-
-        try {
-            predictionLength = Integer.parseInt(predictionLengthString);
-        } catch (NumberFormatException e) {
-            predictionLength = 1;
-        }
-        // Generate new prediction without updating the state
-        long[] predictionNumbers = randomManager.predict(predictionLength);
-        appendNumbers(predictionNumbers, textPrediction);
-    }
-
-    /**
-     * Appends numbers to the text that is displayed by a TextView.
-     * @param numbers numbers to display
-     * @param textView TextView in which to display the numbers
-     */
-    protected void appendNumbers(long[] numbers, TextView textView) {
-        boolean initialNewline = textView.getText().length() > 0;
-        for (int i = 0; i < numbers.length; i++) {
-            if (i > 0 || initialNewline) {
-                textView.append("\n");
-            }
-            textView.append(Long.toString(numbers[i]));
-        }
-    }
-
-    /**
-     * Appends colored numbers to the text that is displayed by a TextView. The numbers are colored
-     * green if they match the corresponding correctNumbers or red otherwise.
-     * @param numbers numbers to display
-     * @param textView TextView in which to display the numbers
-     * @param correctNumbers numbers to compare to
-     */
-    protected void appendColoredNumbers(long[] numbers, TextView textView, long[] correctNumbers) {
-        // Check whether there are enough numbers to compare to
-        if (correctNumbers == null || correctNumbers.length < numbers.length) {
-            appendNumbers(numbers, textView);
+        HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
+        if (historyBuffer == null || historyBuffer.length() == 0) {
             return;
         }
-        // Check whether we need a newline at the beginning
-        boolean initialNewline = textView.getText().length() > 0;
-        // Append colored numbers
-        for (int i = 0; i < numbers.length; i++) {
-            if (i > 0 || initialNewline) {
-                textView.append("\n");
+        int predictionsLength = getLengthPreference(SettingsActivity.KEY_PREF_PREDICTIONS_LENGTH);
+        // Generate new prediction without updating the state
+        long[] predictionNumbers = randomManager.predict(predictionsLength);
+        // Append numbers
+        for (int i = 0; i < predictionNumbers.length; i++) {
+            if (i > 0) {
+                textPrediction.append("\n");
             }
-            Spannable coloredNumber = new SpannableString(Long.toString(numbers[i]));
-            if (numbers[i] == correctNumbers[i]) {
-                ForegroundColorSpan colorGreen = new ForegroundColorSpan(Color.GREEN);
-                coloredNumber.setSpan(colorGreen, 0, coloredNumber.length(),
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            } else {
-                ForegroundColorSpan colorRed = new ForegroundColorSpan(Color.RED);
-                coloredNumber.setSpan(colorRed, 0, coloredNumber.length(),
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            textView.append(coloredNumber);
+            textPrediction.append(Long.toString(predictionNumbers[i]));
         }
+        textPrediction.scrollTo(0, 0);
     }
 
     /**
-     * Concatenates two long arrays.
-     * @param numbers1 the first long array
-     * @param numbers2 the second long array
-     * @return the concatenation of the two arguments
+     * Returns the length corresponding to the preference key.
+     * @param key the key of the length preference
+     * @return the length set in the preference or 1 if the preference string is invalid
      */
-    protected long[] concatenateNumbers(long[] numbers1, long[] numbers2) {
-        long[] jointNumbers = new long[numbers1.length + numbers2.length];
-        // Copy old arrays into new one
-        System.arraycopy(numbers1, 0, jointNumbers, 0, numbers1.length);
-        System.arraycopy(numbers2, 0, jointNumbers, numbers1.length, numbers2.length);
-        return jointNumbers;
+    private int getLengthPreference(String key) {
+        // Get settings
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        String lengthString = sharedPreferences.getString(key, "");
+        int length;
+        try {
+            length = Integer.parseInt(lengthString);
+        } catch (NumberFormatException e) {
+            length = 1;
+        }
+        return length;
     }
 
     /**
      * Makes textInput editable and clears the text of textInput.
      */
-    protected void enableDirectInput() {
+    private void enableDirectInput() {
         textInput.setText("");
         textInput.setEnabled(true);
     }
@@ -572,7 +610,7 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     /**
      * Makes textInput non-editable and displays the input method in textInput.
      */
-    protected void disableDirectInput() {
+    private void disableDirectInput() {
         textInput.setEnabled(false);
         if (inputFile != null) {
             // Display information about the input file
@@ -585,48 +623,30 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     /**
      * Starts an activity for selecting an input file.
      */
-    protected void selectTextFile() {
+    private void selectTextFile() {
         String fileSelectorTitle = getResources().getString(R.string.file_selector_title);
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType(FILE_MIME_TYPE);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         try {
-            startActivityForResult(Intent.createChooser(intent, fileSelectorTitle), FILE_REQUEST_CODE);
+            startActivityForResult(Intent.createChooser(intent, fileSelectorTitle),
+                    FILE_REQUEST_CODE);
         } catch (android.content.ActivityNotFoundException e) {
             abortFileInput();
         }
     }
 
     /**
-     * Processes the result of the input file selection activity.
-     * @param requestCode the request code of the activity result
-     * @param resultCode the result code of the activity result
-     * @param data contains the input file URI if the request was successful
-     */
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == FILE_REQUEST_CODE) {
-            if (resultCode == RESULT_OK) {
-                Uri fileUri = data.getData();
-                processInputFile(fileUri);
-            } else {
-                abortFileInput();
-            }
-        }
-        super.onActivityResult(requestCode, resultCode, data);
-    }
-
-    /**
      * Opens and processes the input file pointed to by fileUri. Disables direct input.
      * @param fileUri the URI of the file to be processed
      */
-    void processInputFile(Uri fileUri) {
+    private void processInputFile(Uri fileUri) {
+        inputFile = new File(fileUri.getPath());
         try {
-            inputFile = new File(fileUri.getPath());
             inputReader = new BufferedReader(new FileReader(inputFile));
             disableDirectInput();
             processInput();
-        } catch (Exception e) {
+        } catch (FileNotFoundException e) {
             abortFileInput();
         }
     }
@@ -635,7 +655,7 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
      * Aborts setting the input method to an input file and sets the input method back to direct
      * input.
      */
-    protected void abortFileInput() {
+    private void abortFileInput() {
         if (inputReader != null) {
             try {
                 inputReader.close();
