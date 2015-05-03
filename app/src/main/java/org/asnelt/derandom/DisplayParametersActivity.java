@@ -19,7 +19,7 @@ package org.asnelt.derandom;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v7.app.ActionBarActivity;
+import android.support.v7.app.AppCompatActivity;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -30,11 +30,13 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.math.BigInteger;
+
 /**
  * This class implements an activity that displays all parameter values of a single random number
  * generator.
  */
-public class DisplayParametersActivity extends ActionBarActivity {
+public class DisplayParametersActivity extends AppCompatActivity {
     /**
      * Initializes the activity by adding elements for all generator parameters.
      * @param savedInstanceState Bundle containing all parameters and parameter names
@@ -65,7 +67,9 @@ public class DisplayParametersActivity extends ActionBarActivity {
 
         // Get auto-detect settings
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        String parameterBase = sharedPreferences.getString(SettingsActivity.KEY_PREF_PARAMETER_BASE, "");
+        String parameterBase = sharedPreferences.getString(SettingsActivity.KEY_PREF_PARAMETER_BASE,
+                "");
+        assert parameterBase != null;
 
         TextView[] textParameterNames = new TextView[parameterNames.length];
         // Add fields for parameters
@@ -84,7 +88,15 @@ public class DisplayParametersActivity extends ActionBarActivity {
                     textParameters[i].setText("0x" + Long.toHexString(parameters[i]));
                     break;
                 default:
-                    textParameters[i].setText(Long.toString(parameters[i]));
+                    String unsignedLongString;
+                    if (parameters[i] >= 0) {
+                        unsignedLongString = Long.toString(parameters[i]);
+                    } else {
+                        BigInteger number = BigInteger.valueOf(parameters[i]);
+                        number = number.add(BigInteger.ONE.shiftLeft(Long.SIZE));
+                        unsignedLongString = number.toString();
+                    }
+                    textParameters[i].setText(unsignedLongString);
             }
             textParameters[i].setInputType(InputType.TYPE_CLASS_NUMBER);
             // Remove the following line to make fields editable

@@ -16,12 +16,14 @@
 
 package org.asnelt.derandom;
 
+import java.util.concurrent.atomic.AtomicReferenceArray;
+
 /**
  * Manages all random number generators.
  */
 public class RandomManager {
     /** Random number generators. */
-    private RandomNumberGenerator[] generators;
+    private volatile AtomicReferenceArray<RandomNumberGenerator> generators;
     /** Names of all linear congruential generators. */
     private static final String[] LCG_NAMES = {
             "LCG: ANSI C",
@@ -156,15 +158,15 @@ public class RandomManager {
             16
     };
     /** Index of currently active generator. */
-    private int currentGenerator;
+    private volatile int currentGenerator;
     /** Best prediction for the latest incoming numbers. */
-    private long[] incomingPredictionNumbers;
+    private volatile long[] incomingPredictionNumbers;
 
     /**
      * Constructor initializing all random numbers generators.
      */
     public RandomManager() {
-        this.generators = new RandomNumberGenerator[0];
+        this.generators = new AtomicReferenceArray<>(0);
         initLinearCongruentialGenerators();
         this.currentGenerator = 0;
         incomingPredictionNumbers = new long[0];
@@ -174,16 +176,18 @@ public class RandomManager {
      * Initializes all linear congruential generators.
      */
     protected void initLinearCongruentialGenerators() {
-        RandomNumberGenerator[] generators;
+        AtomicReferenceArray<RandomNumberGenerator> generators;
 
-        generators = new RandomNumberGenerator[this.generators.length + LCG_NAMES.length];
+        generators = new AtomicReferenceArray<>(this.generators.length() + LCG_NAMES.length);
         // Copy previous generators into new array
-        System.arraycopy(this.generators, 0, generators, 0, this.generators.length);
+        for (int i = 0; i < this.generators.length(); i++) {
+            generators.set(i, this.generators.get(i));
+        }
         // Construct new generators
         for (int i = 0; i < LCG_NAMES.length; i++) {
-            generators[this.generators.length + i] = new LinearCongruentialGenerator(LCG_NAMES[i],
-                    LCG_MULTIPLIERS[i], LCG_INCREMENTS[i], LCG_MODULI[i], LCG_SEEDS[i],
-                    LCG_BIT_RANGE_STARTS[i], LCG_BIT_RANGE_STOPS[i]);
+            generators.set(this.generators.length() + i, new LinearCongruentialGenerator(
+                    LCG_NAMES[i], LCG_MULTIPLIERS[i], LCG_INCREMENTS[i], LCG_MODULI[i],
+                    LCG_SEEDS[i], LCG_BIT_RANGE_STARTS[i], LCG_BIT_RANGE_STOPS[i]));
         }
 
         this.generators = generators;
@@ -194,10 +198,10 @@ public class RandomManager {
      * @return all generator names
      */
     public String[] getGeneratorNames() {
-        String[] names = new String[generators.length];
+        String[] names = new String[generators.length()];
 
-        for (int i = 0; i < generators.length; i++) {
-            names[i] = generators[i].getName();
+        for (int i = 0; i < generators.length(); i++) {
+            names[i] = generators.get(i).getName();
         }
 
         return names;
@@ -207,7 +211,18 @@ public class RandomManager {
      * Resets the state of the current generator.
      */
     public void resetCurrentGenerator() {
-        generators[currentGenerator].reset();
+        generators.get(currentGenerator).reset();
+    }
+
+    /**
+     * Resets the random manager including the states of all generators.
+     */
+    public void reset() {
+        for (int i = 0; i < generators.length(); i++) {
+            generators.get(i).reset();
+        }
+        currentGenerator = 0;
+        incomingPredictionNumbers = new long[0];
     }
 
     /**
@@ -215,7 +230,7 @@ public class RandomManager {
      * @param number index of the currently active generator
      */
     public void setCurrentGenerator(int number) {
-        if (number >= 0 && number < generators.length) {
+        if (number >= 0 && number < generators.length()) {
             currentGenerator = number;
         }
     }
@@ -233,7 +248,7 @@ public class RandomManager {
      * @return name of the currently active generator
      */
     public String getCurrentGeneratorName() {
-        return generators[currentGenerator].getName();
+        return generators.get(currentGenerator).getName();
     }
 
     /**
@@ -241,7 +256,7 @@ public class RandomManager {
      * @return all parameter names of the currently active generator
      */
     public String[] getCurrentParameterNames() {
-        return generators[currentGenerator].getParameterNames();
+        return generators.get(currentGenerator).getParameterNames();
     }
 
     /**
@@ -249,7 +264,7 @@ public class RandomManager {
      * @return parameter values of the currently active generator
      */
     public long[] getCurrentParameters() {
-        return generators[currentGenerator].getParameters();
+        return generators.get(currentGenerator).getParameters();
     }
 
     /**
@@ -258,7 +273,7 @@ public class RandomManager {
      * @return predictions
      */
     public long[] predict(int number) {
-        return generators[currentGenerator].peekNext(number);
+        return generators.get(currentGenerator).peekNext(number);
     }
 
     /**
@@ -269,7 +284,7 @@ public class RandomManager {
      */
     public void findCurrentSeries(long[] incomingNumbers, HistoryBuffer historyBuffer) {
         incomingPredictionNumbers =
-                generators[currentGenerator].findSeries(incomingNumbers, historyBuffer);
+                generators.get(currentGenerator).findSeries(incomingNumbers, historyBuffer);
     }
 
     /**
@@ -283,8 +298,8 @@ public class RandomManager {
         // Evaluate prediction quality for all generators
         int bestScore = 0;
         int bestGenerator = currentGenerator;
-        for (int i = 0; i < generators.length; i++) {
-            long[] prediction = generators[i].findSeries(incomingNumbers, historyBuffer);
+        for (int i = 0; i < generators.length(); i++) {
+            long[] prediction = generators.get(i).findSeries(incomingNumbers, historyBuffer);
             int score = 0;
             for (int j = 0; j < prediction.length; j++) {
                 if (prediction[j] == incomingNumbers[j]) {
@@ -312,47 +327,5 @@ public class RandomManager {
      */
     public long[] getIncomingPredictionNumbers() {
         return incomingPredictionNumbers;
-    }
-    /**
-     * Returns the complete state of the random manager for later recovery.
-     * @return the complete state
-     */
-    public long[] getCompleteState() {
-        int totalStateLength = 1;
-        int[] stateLengths = new int[generators.length];
-        for (int i = 0; i < generators.length; i++) {
-            stateLengths[i] = generators[i].getStateLength();
-            totalStateLength += stateLengths[i];
-        }
-        long[] state = new long[totalStateLength];
-        state[0] = currentGenerator;
-        int offset = 1;
-        for (int i = 0; i < stateLengths.length; i++) {
-            long[] nextState = generators[i].getState();
-            for (int j = 0; j < stateLengths[i]; j++) {
-                state[offset] = nextState[j];
-                offset++;
-            }
-        }
-
-        return state;
-    }
-
-    /**
-     * Sets the complete state of the random manager.
-     * @param state the complete state of the random manager
-     */
-    public void setCompleteState(long[] state) {
-        currentGenerator = (int) state[0];
-        int offset = 1;
-        for (RandomNumberGenerator generator : generators) {
-            int stateLength = generator.getStateLength();
-            long[] nextState = new long[stateLength];
-            for (int j = 0; j < stateLength; j++) {
-                nextState[j] = state[offset];
-                offset++;
-            }
-            generator.setState(nextState);
-        }
     }
 }

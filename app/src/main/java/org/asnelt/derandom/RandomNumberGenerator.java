@@ -20,31 +20,16 @@ package org.asnelt.derandom;
  * This abstract class implements a random number generator.
  */
 public abstract class RandomNumberGenerator {
-    /** Human readable name of the generator. */
-    protected String name;
-
     /**
      * Resets the generator to its initial state.
      */
     public abstract void reset();
 
     /**
-     * Returns the state of the generator for later recovery.
-     * @return the complete state of the generator
+     * Returns the name of the generator.
+     * @return name of the generator
      */
-    public abstract long[] getState();
-
-    /**
-     * Sets the state of the generator.
-     * @param state the complete state of the generator
-     */
-    public abstract void setState(long[] state);
-
-    /**
-     * Returns the length of the generator state.
-     * @return number of elements in state
-     */
-    public abstract int getStateLength();
+    public abstract String getName();
 
     /**
      * Returns human readable names of all parameters.
@@ -57,13 +42,6 @@ public abstract class RandomNumberGenerator {
      * @return all parameters of the generator
      */
     public abstract long[] getParameters();
-
-    /**
-     * Sets all parameters of the generator.
-     * @param parameters all parameters of the generator
-     */
-    @SuppressWarnings("unused")
-    public abstract void setParameters(long[] parameters);
 
     /**
      * Returns the following predictions without updating the state of the generator.
@@ -84,14 +62,5 @@ public abstract class RandomNumberGenerator {
      * Generates the next prediction and updates the state accordingly.
      * @return next prediction
      */
-    @SuppressWarnings("unused")
     protected abstract long next();
-
-    /**
-     * Returns the name of the generator.
-     * @return name of the generator
-     */
-    public String getName() {
-        return name;
-    }
 }

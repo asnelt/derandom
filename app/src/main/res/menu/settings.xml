@@ -14,17 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:orientation="vertical"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context="org.asnelt.derandom.SettingsActivity">
+<menu xmlns:tools="http://schemas.android.com/tools"
+    tools:context="org.asnelt.derandom.SettingsActivity" >
 
-    <FrameLayout
-        android:id="@+id/preferences_layout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:foreground="?android:windowContentOverlay" />
-
-</LinearLayout>
+</menu>

@@ -24,8 +24,11 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v7.app.ActionBarActivity;
+import android.support.v4.app.FragmentManager;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.AppCompatActivity;
 import android.text.InputType;
+import android.text.Layout;
 import android.text.method.ScrollingMovementMethod;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -34,41 +37,28 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
 
 /**
  * This class implements the main activity. It contains the main input output elements and triggers
  * the calculation of predictions.
  */
-public class MainActivity extends ActionBarActivity implements OnItemSelectedListener,
-        HistoryViewListener {
+public class MainActivity extends AppCompatActivity implements OnItemSelectedListener,
+        HistoryView.HistoryViewListener, ProcessingFragment.ProcessingFragmentListener {
     /** Extra string identifier for generator name. */
     public final static String EXTRA_GENERATOR_NAME = "org.asnelt.derandom.GENERATOR_NAME";
     /** Extra string identifier for generator parameter names. */
-    public final static String EXTRA_GENERATOR_PARAMETER_NAMES =
-            "org.asnelt.derandom.GENERATOR_PARAMETER_NAMES";
+    public final static String EXTRA_GENERATOR_PARAMETER_NAMES
+            = "org.asnelt.derandom.GENERATOR_PARAMETER_NAMES";
     /** Extra string identifier for generator parameters. */
-    public final static String EXTRA_GENERATOR_PARAMETERS =
-            "org.asnelt.derandom.GENERATOR_PARAMETERS";
+    public final static String EXTRA_GENERATOR_PARAMETERS
+            = "org.asnelt.derandom.GENERATOR_PARAMETERS";
 
-    /** Key to recover history number variables. */
-    private final static String STATE_HISTORY_NUMBERS = "keyHistoryNumbers";
-    /** Key to recover history prediction variables. */
-    private final static String STATE_HISTORY_PREDICTION = "keyHistoryPrediction";
-    /** Key to recover predictions. */
-    private final static String STATE_PREDICTION = "keyPrediction";
-    /** Key to recover the random manager. */
-    private final static String STATE_RANDOM_MANAGER = "keyRandomManager";
-    /** Key to recover the file URI. */
-    private final static String STATE_FILE_URI = "keyFileUri";
+    /** Tag to attach and find the processing fragment. */
+    private final static String TAG_PROCESSING_FRAGMENT = "tag_processing_fragment";
 
     /** Request code for input files. */
     private static final int FILE_REQUEST_CODE = 0;
@@ -91,12 +81,12 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     private Spinner spinnerInput;
     /** Spinner for selecting and displaying the current generator. */
     private Spinner spinnerGenerator;
-    /** Random manager for generating predictions. */
-    private RandomManager randomManager;
-    /** Current input file for reading numbers. */
-    private File inputFile;
-    /** Reader for reading input numbers. */
-    private BufferedReader inputReader;
+    /** Progress circle for indicating busy status. */
+    private ProgressBar progressBar;
+    /** Fragment for doing generator related processing. */
+    private ProcessingFragment processingFragment;
+    /** Flag for whether the generator should be detected automatically. */
+    private boolean autoDetect;
 
     /**
      * Initializes this activity and eventually recovers its state.
@@ -116,58 +106,60 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
         textInput = (EditText) findViewById(R.id.text_input);
         spinnerInput = (Spinner) findViewById(R.id.spinner_input);
         spinnerGenerator = (Spinner) findViewById(R.id.spinner_generator);
+        progressBar = (ProgressBar) findViewById(R.id.progress_bar);
 
         textInput.setRawInputType(InputType.TYPE_CLASS_NUMBER);
+        textHistoryInput.setHorizontallyScrolling(true);
+        textHistoryPrediction.setHorizontallyScrolling(true);
+        textPrediction.setHorizontallyScrolling(true);
         textHistoryInput.setMovementMethod(new ScrollingMovementMethod());
         textHistoryPrediction.setMovementMethod(new ScrollingMovementMethod());
         textPrediction.setMovementMethod(new ScrollingMovementMethod());
 
-        getSupportActionBar().setDisplayShowHomeEnabled(true);
-        getSupportActionBar().setIcon(R.drawable.ic_launcher);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayShowHomeEnabled(true);
+            actionBar.setIcon(R.drawable.ic_launcher);
+        }
 
-        randomManager = new RandomManager();
-
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        processingFragment = (ProcessingFragment) fragmentManager.findFragmentByTag(
+                TAG_PROCESSING_FRAGMENT);
+        // Generate new fragment if there is no retained fragment
+        if (processingFragment == null) {
+            processingFragment = new ProcessingFragment();
+            fragmentManager.beginTransaction().add(processingFragment,
+                    TAG_PROCESSING_FRAGMENT).commit();
+        }
+        // Apply predictions length preference
+        int predictionLength = getLengthPreference(SettingsActivity.KEY_PREF_PREDICTION_LENGTH);
+        processingFragment.setPredictionLength(predictionLength);
         // Apply history length preference
         int historyLength = getLengthPreference(SettingsActivity.KEY_PREF_HISTORY_LENGTH);
         textHistoryInput.setCapacity(historyLength);
         textHistoryPrediction.setCapacity(historyLength);
+        processingFragment.setCapacity(historyLength);
         // Apply color preference
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        if (sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_COLORED_PAST, false)) {
+        if (sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_COLORED_PAST, true)) {
             textHistoryPrediction.enableColor(null);
         }
+        // Get auto-detect preference
+        autoDetect = sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_AUTO_DETECT, true);
 
         // Eventually recover state
-        if (savedInstanceState == null) {
-            inputFile = null;
-            inputReader = null;
-        } else {
-            long[] historyNumbers = savedInstanceState.getLongArray(STATE_HISTORY_NUMBERS);
-            textHistoryInput.appendNumbers(historyNumbers);
-            textHistoryInput.scrollTo(0, textHistoryInput.getBottom());
-            long[] historyPredictionNumbers = savedInstanceState.getLongArray(
-                    STATE_HISTORY_PREDICTION);
-            textHistoryPrediction.appendNumbers(historyPredictionNumbers, historyNumbers);
-            textHistoryPrediction.scrollTo(0, textHistoryPrediction.getBottom());
-            textPrediction.setText(savedInstanceState.getString(STATE_PREDICTION));
+        if (savedInstanceState != null) {
+            Layout layout = textHistoryInput.getLayout();
+            if (layout != null) {
+                textHistoryInput.scrollTo(0, layout.getHeight());
+            }
+            layout = textHistoryPrediction.getLayout();
+            if (layout != null) {
+                textHistoryPrediction.scrollTo(0, layout.getHeight());
+            }
             textPrediction.scrollTo(0, 0);
-            long[] randomManagerState = savedInstanceState.getLongArray(STATE_RANDOM_MANAGER);
-            randomManager.setCompleteState(randomManagerState);
-            String fileString = savedInstanceState.getString(STATE_FILE_URI);
-            if (fileString == null || fileString.length() == 0) {
-                // Direct input
-                inputFile = null;
-                inputReader = null;
-            } else {
-                // Open input file
-                Uri fileUri = Uri.parse(fileString);
-                inputFile = new File(fileUri.getPath());
-                try {
-                    inputReader = new BufferedReader(new FileReader(inputFile));
-                    disableDirectInput();
-                } catch (FileNotFoundException e) {
-                    abortFileInput();
-                }
+            if (processingFragment.hasInputReader()) {
+                disableDirectInput(processingFragment.getInputUri());
             }
         }
 
@@ -182,13 +174,9 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
         // Apply the adapter to the spinner
         spinnerInput.setAdapter(spinnerInputAdapter);
         spinnerInput.setOnItemSelectedListener(this);
-        // Set right input selection
-        if (inputReader == null && spinnerInput.getSelectedItemPosition() != INDEX_DIRECT_INPUT) {
-            spinnerInput.setSelection(INDEX_DIRECT_INPUT);
-        }
 
         // Create an ArrayAdapter using the string array and a default spinner layout
-        String[] generatorNames = randomManager.getGeneratorNames();
+        String[] generatorNames = processingFragment.getGeneratorNames();
         ArrayAdapter<String> spinnerGeneratorAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, generatorNames);
         // Specify the layout to use when the list of choices appears
@@ -197,69 +185,40 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
         // Apply the adapter to the spinner
         spinnerGenerator.setAdapter(spinnerGeneratorAdapter);
         spinnerGenerator.setOnItemSelectedListener(this);
-    }
 
-    /**
-     * Called to save the state of this instance.
-     * @param savedInstanceState Bundle to save state
-     */
-    @Override
-    public void onSaveInstanceState(Bundle savedInstanceState) {
-        // Save the current state
-        HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
-        long[] historyNumbers;
-        if (historyBuffer == null) {
-            historyNumbers = new long[0];
-        } else {
-            historyNumbers = historyBuffer.toArray();
+        if (processingFragment.isMissingUpdate()) {
+            // The activity missed an update while it was reconstructed
+            processingFragment.updateAll();
         }
-        savedInstanceState.putLongArray(STATE_HISTORY_NUMBERS, historyNumbers);
-        HistoryBuffer historyPredictionBuffer = textHistoryPrediction.getBuffer();
-        long[] historyPredictionNumbers;
-        if (historyPredictionBuffer == null) {
-            historyPredictionNumbers = new long[0];
-        } else {
-            historyPredictionNumbers = historyPredictionBuffer.toArray();
-        }
-        savedInstanceState.putLongArray(STATE_HISTORY_PREDICTION, historyPredictionNumbers);
-        savedInstanceState.putString(STATE_PREDICTION, textPrediction.getText().toString());
-        long[] randomManagerState = randomManager.getCompleteState();
-        savedInstanceState.putLongArray(STATE_RANDOM_MANAGER, randomManagerState);
-        if (inputFile == null) {
-            savedInstanceState.putString(STATE_FILE_URI, "");
-        } else {
-            savedInstanceState.putString(STATE_FILE_URI, inputFile.toURI().toString());
-        }
-        super.onSaveInstanceState(savedInstanceState);
+        onProgressUpdate();
     }
 
     /**
      * Updates everything that is affected by settings changes.
      */
     @Override
-    public void onResume() {
+    protected void onResume() {
         super.onResume();
         // Check history length
         int historyLength = getLengthPreference(SettingsActivity.KEY_PREF_HISTORY_LENGTH);
         textHistoryInput.setCapacity(historyLength);
         textHistoryPrediction.setCapacity(historyLength);
-        // Check color
+        processingFragment.setCapacity(historyLength);
+        // Update auto-detect preference
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        autoDetect = sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_AUTO_DETECT, true);
+        // Check color preference
         boolean coloredPast = sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_COLORED_PAST,
-                false);
-        if (coloredPast != textHistoryPrediction.isColored()) {
-            if (coloredPast) {
-                HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
-                if (historyBuffer != null) {
-                    textHistoryPrediction.enableColor(historyBuffer.toArray());
-                } else {
-                    textHistoryPrediction.enableColor(null);
-                }
-            } else {
-                textHistoryPrediction.disableColor();
+                true);
+        if (coloredPast) {
+            if (!textHistoryPrediction.isColored()) {
+                textHistoryPrediction.enableColor(textHistoryInput.getText().toString());
             }
+        } else {
+            textHistoryPrediction.disableColor();
         }
-        updatePrediction();
+        int predictionLength = getLengthPreference(SettingsActivity.KEY_PREF_PREDICTION_LENGTH);
+        processingFragment.setPredictionLength(predictionLength);
     }
 
     /**
@@ -317,39 +276,24 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
         Spinner spinner = (Spinner) parent;
         if (spinner.getId() == R.id.spinner_input) {
             if (pos == INDEX_DIRECT_INPUT) {
-                if (inputReader != null) {
-                    try {
-                        inputReader.close();
-                    } catch (IOException e) {
-                        // We are already switching back to direct input
-                    }
-                    inputReader = null;
-                }
-                if (inputFile != null) {
-                    inputFile = null;
+                if (processingFragment.hasInputReader()) {
+                    processingFragment.closeInputReader();
                     enableDirectInput();
                 }
-            } else if (pos == INDEX_FILE_INPUT && inputFile == null) {
-                selectTextFile();
+                processingFragment.setInputSelection(pos);
+            } else if (pos == INDEX_FILE_INPUT) {
+                if (processingFragment.getInputSelection() != INDEX_FILE_INPUT) {
+                    selectTextFile();
+                    processingFragment.setInputSelection(pos);
+                } else {
+                    if (processingFragment.getInputUri() == null) {
+                        enableDirectInput();
+                    }
+                }
             }
         }
         if (spinner.getId() == R.id.spinner_generator) {
-            if (randomManager.getCurrentGenerator() != pos) {
-                // Process complete history
-                randomManager.setCurrentGenerator(pos);
-                HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
-                if (historyBuffer != null && historyBuffer.length() > 0) {
-                    long[] historyNumbers = historyBuffer.toArray();
-                    randomManager.resetCurrentGenerator();
-                    randomManager.findCurrentSeries(historyNumbers, null);
-                    textHistoryPrediction.clear();
-                    long[] historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
-                    textHistoryPrediction.appendNumbers(historyPredictionNumbers, historyNumbers);
-                    textHistoryPrediction.scrollTo(0,
-                            textHistoryPrediction.getLayout().getHeight());
-                    updatePrediction();
-                }
-            }
+            processingFragment.setCurrentGenerator(pos);
         }
     }
 
@@ -379,6 +323,98 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     }
 
     /**
+     * Called when the history prediction was completely replaced.
+     * @param historyNumbers previously entered numbers
+     * @param historyPredictionNumbers predictions for previous numbers
+     */
+    public void onHistoryPredictionReplaced(long[] historyNumbers,
+                                            long[] historyPredictionNumbers) {
+        textHistoryPrediction.clear();
+        textHistoryPrediction.appendNumbers(historyPredictionNumbers, historyNumbers);
+    }
+
+    /**
+     * Called when the random number generator selection changed.
+     * @param generatorIndex index of new generator
+     */
+    public void onGeneratorChanged(int generatorIndex) {
+        // Update spinner and thereby historyPredictionBuffer
+        spinnerGenerator.setSelection(generatorIndex);
+    }
+
+    /**
+     * Called when the input history changed.
+     * @param inputNumbers the entered numbers
+     * @param predictionNumbers predictions for entered numbers
+     */
+    public void onHistoryChanged(long[] inputNumbers, long[] predictionNumbers) {
+        // Appends input numbers to history
+        textHistoryInput.appendNumbers(inputNumbers);
+        textHistoryPrediction.appendNumbers(predictionNumbers, inputNumbers);
+    }
+
+    /**
+     * Called when the predictions for upcoming numbers changed.
+     * @param predictionNumbers predictions of upcoming numbers
+     */
+    public void onPredictionChanged(long[] predictionNumbers) {
+        textPrediction.setText("");
+        if (predictionNumbers == null) {
+            return;
+        }
+        // Append numbers
+        for (int i = 0; i < predictionNumbers.length; i++) {
+            if (i > 0) {
+                textPrediction.append("\n");
+            }
+            textPrediction.append(Long.toString(predictionNumbers[i]));
+        }
+        textPrediction.scrollTo(0, 0);
+    }
+
+    /**
+     * Called when setting the input method to an input file is aborted and sets the input method
+     * back to direct input.
+     */
+    public void onFileInputAborted() {
+        enableDirectInput();
+        String errorMessage = getResources().getString(R.string.file_error_message);
+        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Called when invalid numbers where entered.
+     */
+    public void onInvalidInputNumber() {
+        String errorMessage = getResources().getString(R.string.number_error_message);
+        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Called when the input was cleared.
+     */
+    public void onClear() {
+        textHistoryInput.clear();
+        textHistoryPrediction.clear();
+        textPrediction.setText("");
+        if (processingFragment.getInputUri() == null) {
+            // Direct input; reset textInput
+            textInput.setText("");
+        }
+    }
+
+    /**
+     * Called when the progress status changed.
+     */
+    public void onProgressUpdate() {
+        if (processingFragment.isProcessingInput()) {
+            progressBar.setVisibility(View.VISIBLE);
+        } else {
+            progressBar.setVisibility(View.GONE);
+        }
+    }
+
+    /**
      * Processes the result of the input file selection activity.
      * @param requestCode the request code of the activity result
      * @param resultCode the result code of the activity result
@@ -388,10 +424,13 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_REQUEST_CODE) {
             if (resultCode == RESULT_OK) {
+                clearInput();
                 Uri fileUri = data.getData();
-                processInputFile(fileUri);
+                disableDirectInput(fileUri);
+                processingFragment.processInputFile(fileUri, autoDetect);
             } else {
-                abortFileInput();
+                processingFragment.closeInputReader();
+                onFileInputAborted();
             }
         }
         super.onActivityResult(requestCode, resultCode, data);
@@ -402,120 +441,37 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
      * item.
      */
     private void processInput() {
-        String input = "";
-        try {
-            if (inputReader == null) {
-                // Read input from textInput
-                input = textInput.getText().toString();
-            } else {
-                // Read input from the inputReader
-                if (inputFile != null) {
-                    // File input; reset input
-                    clearInput();
-                }
-                try {
-                    while (inputReader.ready()) {
-                        String nextInput = inputReader.readLine();
-                        if (nextInput == null) {
-                            break;
-                        }
-                        input += nextInput + "\n";
-                    }
-                    if (inputFile != null) {
-                        // Reset inputReader
-                        inputReader.close();
-                        inputReader = new BufferedReader(new FileReader(inputFile));
-                    }
-                } catch (IOException e) {
-                    // Abort input processing
-                    String errorMessage = getResources().getString(R.string.file_error_message);
-                    Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            }
-            try {
-                processInputString(input);
-            } catch (NumberFormatException e) {
-                String errorMessage = getResources().getString(R.string.number_error_message);
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-            }
-            if (inputReader == null) {
-                textInput.setText("");
-            }
-        } catch (OutOfMemoryError e) {
-            // Abort input processing and reset history and input
-            textHistoryInput.clear();
-            textHistoryPrediction.clear();
-            String errorMessage = getResources().getString(R.string.memory_error_message);
-            Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+        if (processingFragment.isProcessingInput()) {
+            return;
         }
-    }
-
-    /**
-     * Processes an input string of newline separated integers and calculates a prediction.
-     * @param input the input string to be processed
-     */
-    private void processInputString(String input) throws NumberFormatException {
-        String[] stringNumbers = input.split("\n");
-        long[] inputNumbers = new long[stringNumbers.length];
-
-        // Parse numbers
-        for (int i = 0; i < inputNumbers.length; i++) {
-            inputNumbers[i] = Long.parseLong(stringNumbers[i]);
-        }
-
-        HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
-        // Generate new prediction with updating the state
-        long[] nextHistoryPredictionNumbers = null;
-        boolean changedGenerator = false;
-        // Get auto-detect settings
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        boolean autoDetect = sharedPreferences.getBoolean(SettingsActivity.KEY_PREF_AUTO_DETECT,
-                false);
-        if (autoDetect) {
-            // Detect best generator and update all states
-            int bestGenerator = randomManager.detectGenerator(inputNumbers, historyBuffer);
-            nextHistoryPredictionNumbers = randomManager.getIncomingPredictionNumbers();
-            if (bestGenerator != randomManager.getCurrentGenerator()) {
-                // Update spinner and thereby historyPredictionBuffer
-                spinnerGenerator.setSelection(bestGenerator);
-                changedGenerator = true;
+        if (!processingFragment.hasInputReader()) {
+            // Read input from textInput
+            processingFragment.processInputString(textInput.getText().toString(), autoDetect);
+            textInput.setText("");
+        } else {
+            // Read input from the inputReader
+            if (processingFragment.getInputUri() != null) {
+                // File input; reset input
+                clearInput();
             }
+            processingFragment.processInputReader(autoDetect);
         }
-        if (!autoDetect || changedGenerator) {
-            randomManager.findCurrentSeries(inputNumbers, historyBuffer);
-            nextHistoryPredictionNumbers = randomManager.getIncomingPredictionNumbers();
-        }
-
-        // Appends input numbers to history
-        textHistoryInput.appendNumbers(inputNumbers);
-        textHistoryPrediction.appendNumbers(nextHistoryPredictionNumbers, inputNumbers);
-
-        updatePrediction();
     }
 
     /**
      * Clears all inputs and predictions. Called when the user clicks the discard item.
      */
     private void clearInput() {
-        textHistoryInput.clear();
-        textHistoryPrediction.clear();
-        textPrediction.setText("");
-        randomManager = new RandomManager();
-        randomManager.setCurrentGenerator(spinnerGenerator.getSelectedItemPosition());
-        if (inputReader == null) {
-            // Direct input; reset textInput
-            textInput.setText("");
-        }
+        processingFragment.clear();
     }
 	
     /**
      * Show generator parameters in a new activity. Called when the user clicks the parameters item.
      */
     private void openParameters() {
-        String name = randomManager.getCurrentGeneratorName();
-        String[] parameterNames = randomManager.getCurrentParameterNames();
-        long[] parameters = randomManager.getCurrentParameters();
+        String name = processingFragment.getCurrentGeneratorName();
+        String[] parameterNames = processingFragment.getCurrentParameterNames();
+        long[] parameters = processingFragment.getCurrentParameters();
 
         // Start new activity
         Intent intent = new Intent(this, DisplayParametersActivity.class);
@@ -560,28 +516,6 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     }
 
     /**
-     * Calculates a new prediction and displays it in textPrediction.
-     */
-    private void updatePrediction() {
-        textPrediction.setText("");
-        HistoryBuffer historyBuffer = textHistoryInput.getBuffer();
-        if (historyBuffer == null || historyBuffer.length() == 0) {
-            return;
-        }
-        int predictionsLength = getLengthPreference(SettingsActivity.KEY_PREF_PREDICTIONS_LENGTH);
-        // Generate new prediction without updating the state
-        long[] predictionNumbers = randomManager.predict(predictionsLength);
-        // Append numbers
-        for (int i = 0; i < predictionNumbers.length; i++) {
-            if (i > 0) {
-                textPrediction.append("\n");
-            }
-            textPrediction.append(Long.toString(predictionNumbers[i]));
-        }
-        textPrediction.scrollTo(0, 0);
-    }
-
-    /**
      * Returns the length corresponding to the preference key.
      * @param key the key of the length preference
      * @return the length set in the preference or 1 if the preference string is invalid
@@ -605,18 +539,27 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
     private void enableDirectInput() {
         textInput.setText("");
         textInput.setEnabled(true);
+        // Set spinner selection to direct input
+        if (spinnerInput.getSelectedItemPosition() != INDEX_DIRECT_INPUT) {
+            spinnerInput.setSelection(INDEX_DIRECT_INPUT);
+        }
     }
 
     /**
      * Makes textInput non-editable and displays the input method in textInput.
+     * @param inputUri the URI of the input file
      */
-    private void disableDirectInput() {
+    private void disableDirectInput(Uri inputUri) {
         textInput.setEnabled(false);
-        if (inputFile != null) {
+        if (inputUri != null) {
             // Display information about the input file
             String inputDisplay = getResources().getString(R.string.input_file_name);
-            inputDisplay += ": " + inputFile.getAbsolutePath();
-            textInput.setText(inputDisplay);
+            try {
+                inputDisplay += ": " + inputUri.getPath();
+                textInput.setText(inputDisplay);
+            } catch (NullPointerException e) {
+                textInput.setText("");
+            }
         }
     }
 
@@ -632,45 +575,8 @@ public class MainActivity extends ActionBarActivity implements OnItemSelectedLis
             startActivityForResult(Intent.createChooser(intent, fileSelectorTitle),
                     FILE_REQUEST_CODE);
         } catch (android.content.ActivityNotFoundException e) {
-            abortFileInput();
+            processingFragment.closeInputReader();
+            onFileInputAborted();
         }
-    }
-
-    /**
-     * Opens and processes the input file pointed to by fileUri. Disables direct input.
-     * @param fileUri the URI of the file to be processed
-     */
-    private void processInputFile(Uri fileUri) {
-        inputFile = new File(fileUri.getPath());
-        try {
-            inputReader = new BufferedReader(new FileReader(inputFile));
-            disableDirectInput();
-            processInput();
-        } catch (FileNotFoundException e) {
-            abortFileInput();
-        }
-    }
-
-    /**
-     * Aborts setting the input method to an input file and sets the input method back to direct
-     * input.
-     */
-    private void abortFileInput() {
-        if (inputReader != null) {
-            try {
-                inputReader.close();
-            } catch (IOException e) {
-                // File input is already aborting
-            }
-            inputReader = null;
-        }
-        inputFile = null;
-        enableDirectInput();
-        // Set spinner selection to direct input
-        if (spinnerInput.getSelectedItemPosition() != INDEX_DIRECT_INPUT) {
-            spinnerInput.setSelection(INDEX_DIRECT_INPUT);
-        }
-        String errorMessage = getResources().getString(R.string.file_error_message);
-        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
     }
 }

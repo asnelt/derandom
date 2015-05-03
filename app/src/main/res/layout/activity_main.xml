@@ -22,6 +22,8 @@ limitations under the License.
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
     tools:context="org.asnelt.derandom.MainActivity" >
 
    	<View
@@ -99,7 +101,7 @@ limitations under the License.
         android:layout_marginEnd="16dp"
         android:gravity="bottom"
         android:textSize="14sp"
-        android:textIsSelectable="true" />
+        android:freezesText="true" />
 
     <org.asnelt.derandom.HistoryView
         android:id="@+id/text_history_prediction"
@@ -113,9 +115,10 @@ limitations under the License.
         android:layout_below="@+id/spinner_generator"
         android:layout_marginLeft="16dp"
         android:layout_marginStart="16dp"
+        android:scrollbars="vertical"
         android:gravity="bottom"
         android:textSize="14sp"
-        android:textIsSelectable="true" />
+        android:freezesText="true" />
 
     <View
         android:id="@+id/view_vertical_center"
@@ -135,6 +138,7 @@ limitations under the License.
         android:layout_below="@+id/view_vertical_center"
         android:layout_marginRight="16dp"
         android:layout_marginEnd="16dp"
+        android:scrollbars="vertical"
         android:gravity="top"
         android:hint="@string/edit_message"
         android:inputType="textMultiLine"
@@ -152,8 +156,24 @@ limitations under the License.
         android:layout_below="@+id/view_vertical_center"
         android:layout_marginLeft="16dp"
         android:layout_marginStart="16dp"
+        android:scrollbars="vertical"
         android:gravity="top"
         android:textSize="14sp"
-        android:textIsSelectable="true" />
+        android:freezesText="true" />
+
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/view_horizontal_center"
+        android:layout_alignStart="@+id/view_horizontal_center"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="true"
+        android:layout_below="@+id/view_vertical_center"
+        android:layout_marginLeft="16dp"
+        android:layout_marginStart="16dp"
+        android:visibility="gone"
+        style="@android:style/Widget.ProgressBar" />
 
 </RelativeLayout>

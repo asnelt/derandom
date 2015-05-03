@@ -58,17 +58,19 @@ public class HistoryBuffer {
         if (capacity < 0) {
             throw new IllegalArgumentException("capacity must not be negative");
         }
-        if (capacity < numbers.length) {
-            // Shrink numbers
-            if (length() >= capacity) {
-                numbers = getLast(capacity);
-                head = 0;
-                tail = capacity - 1;
-            } else {
-                rebuildNumbers(capacity);
+        if (this.capacity != capacity) {
+            if (capacity < numbers.length) {
+                // Shrink numbers
+                if (length() >= capacity) {
+                    numbers = getLast(capacity);
+                    head = 0;
+                    tail = capacity - 1;
+                } else {
+                    rebuildNumbers(capacity);
+                }
             }
+            this.capacity = capacity;
         }
-        this.capacity = capacity;
     }
 
     /**
@@ -151,14 +153,6 @@ public class HistoryBuffer {
      */
     public long[] toArray() {
         return getLast(length());
-    }
-
-    /**
-     * Returns the maximum number of elements the buffer can store.
-     * @return the capacity of the buffer
-     */
-    public int getCapacity() {
-        return capacity;
     }
 
     /**

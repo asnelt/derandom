@@ -46,10 +46,10 @@ limitations under the License.
             android:summary="@string/pref_auto_detect_summary"
             android:defaultValue="true" />
         <EditTextPreference
-            android:key="pref_predictions_length"
-            android:title="@string/pref_predictions_length"
-            android:dialogTitle="@string/pref_predictions_length"
+            android:key="pref_prediction_length"
+            android:title="@string/pref_prediction_length"
+            android:dialogTitle="@string/pref_prediction_length"
             android:inputType="number"
-            android:defaultValue="@string/pref_predictions_length_default_value" />
+            android:defaultValue="@string/pref_prediction_length_default_value" />
     </PreferenceCategory>
 </PreferenceScreen>

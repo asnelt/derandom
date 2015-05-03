@@ -18,6 +18,7 @@ package org.asnelt.derandom;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.text.Layout;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
@@ -28,12 +29,28 @@ import android.widget.TextView;
  * A view for displaying a HistoryBuffer.
  */
 public class HistoryView extends TextView {
+    /**
+     * Interface for listening to scroll change events.
+     */
+    public interface HistoryViewListener {
+        /**
+         * Called in response to a scroll event.
+         * @param view the origin of the scroll event
+         * @param horizontal current horizontal scroll origin
+         * @param vertical current vertical scroll origin
+         * @param oldHorizontal old horizontal scroll origin
+         * @param oldVertical old vertical scroll origin
+         */
+        void onScrollChanged(HistoryView view, int horizontal, int vertical,
+                             int oldHorizontal, int oldVertical);
+    }
+
     /** A listener to be notified when a scroll event occurs. */
     private HistoryViewListener historyViewListener = null;
-    /** Buffer for numbers to be displayed. */
-    HistoryBuffer buffer = null;
     /** Flag for showing colored numbers. */
     private boolean colored = false;
+    /** Maximum number of numbers that can be stored. */
+    int capacity = 0;
 
     /**
      * Standard constructor for a HistoryView.
@@ -88,22 +105,21 @@ public class HistoryView extends TextView {
     }
 
     /**
-     * Sets the maximum number of numbers to display. Initializes the internal number buffer if it
-     * is not initialized.
+     * Sets the maximum number of numbers to display and eventually removes numbers if too many are
+     * displayed.
      * @param capacity the maximum number of numbers to display
      */
     public void setCapacity(int capacity) {
-        if (buffer == null) {
-            buffer = new HistoryBuffer(capacity);
-        } else {
-            int currentLength = buffer.length();
-            buffer.setCapacity(capacity);
-            if (currentLength > capacity) {
-                // Shorten history
-                removeExcessNumbers(currentLength - capacity);
-                scrollTo(0, getLayout().getHeight());
+        int currentLength = getLineCount();
+        if (currentLength > capacity) {
+            // Shorten history
+            removeExcessNumbers(currentLength - capacity);
+            Layout layout = getLayout();
+            if (layout != null) {
+                scrollTo(0, layout.getHeight());
             }
         }
+        this.capacity = capacity;
     }
 
     /**
@@ -115,17 +131,41 @@ public class HistoryView extends TextView {
     }
 
     /**
-     * Enables color for displaying the numbers. The stored numbers are colored green if they match
+     * Enables color for displaying the numbers. The shown numbers are colored green if they match
      * the corresponding correctNumbers or red otherwise.
-     * @param correctNumbers numbers to compare to
+     * @param correctSequence corresponding correct numbers separated by newline characters
      */
-    public void enableColor(long[] correctNumbers) {
-        if (!colored) {
-            colored = true;
-            setText("");
-            if (buffer != null) {
-                showNumbers(buffer.toArray(), correctNumbers, 0);
+    public void enableColor(String correctSequence) {
+        colored = true;
+        if (correctSequence == null || correctSequence.length() == 0 || getText().length() == 0) {
+            return;
+        }
+        String[] correctNumbers = correctSequence.split("\n");
+        String[] currentNumbers = getText().toString().split("\n");
+        if (correctNumbers.length != currentNumbers.length) {
+            return;
+        }
+        setText("");
+        // Append colored numbers
+        for (int i = 0; i < currentNumbers.length; i++) {
+            if (i > 0) {
+                append("\n");
             }
+            Spannable coloredNumberString = new SpannableString(currentNumbers[i]);
+            if (currentNumbers[i].compareTo(correctNumbers[i]) == 0) {
+                ForegroundColorSpan colorGreen = new ForegroundColorSpan(Color.GREEN);
+                coloredNumberString.setSpan(colorGreen, 0, coloredNumberString.length(),
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else {
+                ForegroundColorSpan colorRed = new ForegroundColorSpan(Color.RED);
+                coloredNumberString.setSpan(colorRed, 0, coloredNumberString.length(),
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            append(coloredNumberString);
+        }
+        Layout layout = getLayout();
+        if (layout != null) {
+            scrollTo(0, layout.getHeight());
         }
     }
 
@@ -133,35 +173,19 @@ public class HistoryView extends TextView {
      * Disables color for displaying the numbers.
      */
     public void disableColor() {
-        if (colored) {
-            colored = false;
-            setText("");
-            if (buffer != null) {
-                showNumbers(buffer.toArray(), null, 0);
-            }
-        }
+        colored = false;
+        setText(getText().toString());
     }
 
     /**
-     * Clears the view and empties the internal number buffer.
+     * Clears the view.
      */
     public void clear() {
         setText("");
-        if (buffer != null) {
-            buffer.clear();
-        }
     }
 
     /**
-     * Returns the buffer that stores all numbers that are displayed.
-     * @return the number buffer
-     */
-    public HistoryBuffer getBuffer() {
-        return buffer;
-    }
-
-    /**
-     * Appends numbers to the text that is displayed and puts them into the internal buffer.
+     * Appends numbers to the text that is displayed.
      * @param numbers numbers to display
      */
     public void appendNumbers(long[] numbers) {
@@ -169,9 +193,9 @@ public class HistoryView extends TextView {
     }
 
     /**
-     * Appends numbers to the text that is displayed and puts them into the internal buffer. If
-     * correctNumbers is not null and color is enabled then the numbers are colored. The numbers are
-     * colored green if they match the corresponding correctNumbers or red otherwise.
+     * Appends numbers to the text that is displayed. If correctNumbers is not null and color is
+     * enabled then the numbers are colored. The numbers are colored green if they match the
+     * corresponding correctNumbers or red otherwise.
      * @param numbers numbers to display
      * @param correctNumbers numbers to compare to
      */
@@ -179,29 +203,26 @@ public class HistoryView extends TextView {
         if (numbers == null || numbers.length == 0) {
             return;
         }
+        // Number of lines to remove from beginning of textView
+        int linesToRemove = getLineCount() + numbers.length - capacity;
+        removeExcessNumbers(linesToRemove);
         // Offset to first number to append
-        int offset = 0;
-        if (buffer != null) {
-            // Number of lines to remove from beginning of textView
-            int linesToRemove = buffer.length() + numbers.length - buffer.getCapacity();
-            removeExcessNumbers(linesToRemove);
-            buffer.put(numbers);
-            offset = numbers.length - buffer.getCapacity();
-            if (offset < 0) {
-                offset = 0;
-            }
+        int offset = numbers.length - capacity;
+        if (offset < 0) {
+            offset = 0;
         }
         showNumbers(numbers, correctNumbers, offset);
+        Layout layout = getLayout();
+        if (layout != null) {
+            scrollTo(0, layout.getHeight());
+        }
     }
 
     /**
-     * Removes numbers that would exceed the capacity of the buffer.
+     * Removes numbers that would exceed the capacity.
      * @param linesToRemove number of lines to remove from beginning
      */
     private void removeExcessNumbers(int linesToRemove) {
-        if (buffer == null) {
-            return;
-        }
         if (linesToRemove > 0) {
             // Find number of characters to remove
             CharSequence text = getText();
@@ -241,20 +262,21 @@ public class HistoryView extends TextView {
             if (i > offset || initialNewline) {
                 append("\n");
             }
+            String numberString = Long.toString(numbers[i]);
             if (useColor) {
-                Spannable coloredNumber = new SpannableString(Long.toString(numbers[i]));
+                Spannable coloredNumberString = new SpannableString(numberString);
                 if (numbers[i] == correctNumbers[i]) {
                     ForegroundColorSpan colorGreen = new ForegroundColorSpan(Color.GREEN);
-                    coloredNumber.setSpan(colorGreen, 0, coloredNumber.length(),
+                    coloredNumberString.setSpan(colorGreen, 0, coloredNumberString.length(),
                             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
                 } else {
                     ForegroundColorSpan colorRed = new ForegroundColorSpan(Color.RED);
-                    coloredNumber.setSpan(colorRed, 0, coloredNumber.length(),
+                    coloredNumberString.setSpan(colorRed, 0, coloredNumberString.length(),
                             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
-                append(coloredNumber);
+                append(coloredNumberString);
             } else {
-                append(Long.toString(numbers[i]));
+                append(numberString);
             }
         }
     }
