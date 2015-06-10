@@ -41,16 +41,18 @@ import android.widget.Toast;
  */
 public class SettingsActivity extends PreferenceActivity
         implements SharedPreferences.OnSharedPreferenceChangeListener {
-    /** Key to identify the history length preference. */
-    public static final String KEY_PREF_HISTORY_LENGTH = "pref_history_length";
-    /** Key to identify the colored past preference. */
-    public static final String KEY_PREF_COLORED_PAST = "pref_colored_past";
     /** Key to identify the auto-detect preference. */
     public static final String KEY_PREF_AUTO_DETECT = "pref_auto_detect";
-    /** Key to identify the parameter base preference. */
-    public static final String KEY_PREF_PARAMETER_BASE = "pref_parameter_base";
     /** Key to identify the predictions length preference. */
     public static final String KEY_PREF_PREDICTION_LENGTH = "pref_prediction_length";
+    /** Key to identify the colored past preference. */
+    public static final String KEY_PREF_COLORED_PAST = "pref_colored_past";
+    /** Key to identify the history length preference. */
+    public static final String KEY_PREF_HISTORY_LENGTH = "pref_history_length";
+    /** Key to identify the parameter base preference. */
+    public static final String KEY_PREF_PARAMETER_BASE = "pref_parameter_base";
+    /** Key to identify the socket port preference. */
+    public static final String KEY_PREF_SOCKET_PORT = "pref_socket_port";
 
     /** Delegate for enabling an action bar. */
     private AppCompatDelegate delegate;
@@ -100,9 +102,10 @@ public class SettingsActivity extends PreferenceActivity
         }
         preferences.registerOnSharedPreferenceChangeListener(this);
         // Initialize summaries
+        onSharedPreferenceChanged(preferences, KEY_PREF_PREDICTION_LENGTH);
         onSharedPreferenceChanged(preferences, KEY_PREF_HISTORY_LENGTH);
         onSharedPreferenceChanged(preferences, KEY_PREF_PARAMETER_BASE);
-        onSharedPreferenceChanged(preferences, KEY_PREF_PREDICTION_LENGTH);
+        onSharedPreferenceChanged(preferences, KEY_PREF_SOCKET_PORT);
     }
 
     /**
@@ -136,33 +139,48 @@ public class SettingsActivity extends PreferenceActivity
             preference = findFragmentPreference(key);
         }
         switch (key) {
-            case KEY_PREF_HISTORY_LENGTH:
             case KEY_PREF_PREDICTION_LENGTH:
-                EditTextPreference lengthPreference = (EditTextPreference) preference;
-                String lengthString = lengthPreference.getText();
+            case KEY_PREF_HISTORY_LENGTH:
+            case KEY_PREF_SOCKET_PORT:
+                EditTextPreference numberPreference = (EditTextPreference) preference;
+                String numberString = numberPreference.getText();
                 try {
-                    int lengthInteger = Integer.parseInt(lengthString);
+                    int numberInteger = Integer.parseInt(numberString);
                     // Check that numbers fit into a single string
-                    if (lengthInteger > Integer.MAX_VALUE
+                    if (numberInteger > Integer.MAX_VALUE
                             / (Long.toString(Long.MAX_VALUE).length()+1)) {
+                        throw new NumberFormatException();
+                    }
+                    if (key.equals(SettingsActivity.KEY_PREF_SOCKET_PORT)
+                            && numberInteger > 0xFFFF) {
                         throw new NumberFormatException();
                     }
                 } catch (NumberFormatException e) {
                     // Correct to default value
-                    String defaultValue;
-                    if (key.equals(SettingsActivity.KEY_PREF_HISTORY_LENGTH)) {
-                        defaultValue = getResources().getString(
-                                R.string.pref_history_length_default_value);
-                    } else {
-                        defaultValue = getResources().getString(
-                                R.string.pref_prediction_length_default_value);
+                    String defaultValue = "";
+                    switch (key) {
+                        case SettingsActivity.KEY_PREF_PREDICTION_LENGTH:
+                            defaultValue = getResources().getString(
+                                    R.string.pref_prediction_length_default_value);
+                            break;
+                        case SettingsActivity.KEY_PREF_HISTORY_LENGTH:
+                            defaultValue = getResources().getString(
+                                    R.string.pref_history_length_default_value);
+                            break;
+                        case SettingsActivity.KEY_PREF_SOCKET_PORT:
+                            defaultValue = getResources().getString(
+                                    R.string.pref_socket_port_default_value);
+                            break;
                     }
-                    lengthPreference.setText(defaultValue);
+                    numberPreference.setText(defaultValue);
                     String errorMessage = getResources().getString(R.string.number_error_message);
                     Toast.makeText(SettingsActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
                 }
-                String summary = lengthPreference.getText();
-                if (summary != null && summary.equals("1")) {
+                String summary = numberPreference.getText();
+                if (key.equals(SettingsActivity.KEY_PREF_SOCKET_PORT)) {
+                    summary = getResources().getString(R.string.pref_socket_port_summary) + " "
+                            + summary;
+                } else if (summary != null && summary.equals("1")) {
                     if (key.equals(SettingsActivity.KEY_PREF_HISTORY_LENGTH)) {
                         summary += " " + getResources().getString(
                                 R.string.pref_history_length_summary_singular);
@@ -179,7 +197,7 @@ public class SettingsActivity extends PreferenceActivity
                                 R.string.pref_prediction_length_summary_plural);
                     }
                 }
-                lengthPreference.setSummary(summary);
+                numberPreference.setSummary(summary);
                 break;
             case KEY_PREF_PARAMETER_BASE:
                 ListPreference parameterBasePreference = (ListPreference) preference;

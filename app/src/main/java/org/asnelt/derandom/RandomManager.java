@@ -295,11 +295,26 @@ public class RandomManager {
      * @return index of the best matching generator
      */
     public int detectGenerator(long[] incomingNumbers, HistoryBuffer historyBuffer) {
+        // Check whether the current generator predicts the incoming numbers
+        long[] prediction = predict(incomingNumbers.length);
+        boolean anyFailure = false;
+        for (int i = 0; i < prediction.length; i++) {
+            if (prediction[i] != incomingNumbers[i]) {
+                anyFailure = true;
+                break;
+            }
+        }
+        if (!anyFailure) {
+            // Keep current generator
+            incomingPredictionNumbers = generators.get(currentGenerator).next(
+                    incomingNumbers.length);
+            return currentGenerator;
+        }
         // Evaluate prediction quality for all generators
         int bestScore = 0;
         int bestGenerator = currentGenerator;
         for (int i = 0; i < generators.length(); i++) {
-            long[] prediction = generators.get(i).findSeries(incomingNumbers, historyBuffer);
+            prediction = generators.get(i).findSeries(incomingNumbers, historyBuffer);
             int score = 0;
             for (int j = 0; j < prediction.length; j++) {
                 if (prediction[j] == incomingNumbers[j]) {

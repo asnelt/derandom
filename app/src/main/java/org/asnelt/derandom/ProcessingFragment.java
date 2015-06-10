@@ -24,12 +24,21 @@ import android.os.Looper;
 import android.support.v4.app.Fragment;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * This class implements a fragment for doing generator related processing. The fragment is retained
@@ -67,10 +76,16 @@ public class ProcessingFragment extends Fragment {
         void onPredictionChanged(long[] predictionNumbers);
 
         /**
-         * Called when setting the input method to an input file is aborted and sets the input method
-         * back to direct input.
+         * Called when setting the input method to an input file is aborted and sets the input
+         * method back to direct input.
          */
         void onFileInputAborted();
+
+        /**
+         * Called when setting the input method to an input socket is aborted and sets the input
+         * method back to direct input.
+         */
+        void onSocketInputAborted();
 
         /**
          * Called when invalid numbers where entered.
@@ -86,6 +101,12 @@ public class ProcessingFragment extends Fragment {
          * Called when the progress status changed.
          */
         void onProgressUpdate();
+
+        /**
+         * Called when the status of the network socket changed.
+         * @param newStatus a description of the new status
+         */
+        void onSocketStatusChanged(String newStatus);
     }
 
     /** Random manager for generating predictions. */
@@ -96,20 +117,40 @@ public class ProcessingFragment extends Fragment {
     private final HistoryBuffer historyBuffer;
     /** Object for synchronizing the main thread and the processing thread. */
     private final Object synchronizationObject;
+    /** Executor service for all processing tasks. */
+    private final ExecutorService processingExecutor;
+    /** Executor service for server task. */
+    private final ExecutorService serverExecutor;
+    /** Lock for the disconnected condition. */
+    private final Lock connectionLock;
+    /** Condition that is triggered when the client socket is disconnected. */
+    private final Condition disconnected;
     /** Number of numbers to forecast. */
     private volatile int predictionLength;
+    /** Flag for whether the generator should be detected automatically. */
+    private volatile boolean autoDetect;
     /** Current input file for reading numbers. */
     private volatile Uri inputUri;
     /** Reader for reading input numbers. */
     private volatile BufferedReader inputReader;
+    /** Writer for writing predictions to the client socket. */
+    private volatile BufferedWriter outputWriter;
     /** Flag for whether a user interface update was missed during a configuration change. */
     private volatile boolean missingUpdate;
     /** Number of process input tasks. */
     private volatile int inputTaskLength;
+    /** Flag for whether processing should continue. */
+    private volatile boolean processingDesirable;
+    /** Server socket port. */
+    private volatile int serverPort;
+    /** Server socket. */
+    private ServerSocket serverSocket;
+    /** Client socket. */
+    private volatile Socket clientSocket;
     /** Listener for processing changes. */
     private ProcessingFragmentListener listener;
-    /** Executor service for all processing tasks. */
-    private ExecutorService processingExecutor;
+    /** Future for cancelling the server task. */
+    private Future<?> serverFuture;
     /** Index of selected input method. */
     private int inputSelection;
 
@@ -120,17 +161,26 @@ public class ProcessingFragment extends Fragment {
     public ProcessingFragment() {
         super();
         predictionLength = 0;
+        autoDetect = false;
         inputUri = null;
         inputReader = null;
+        outputWriter = null;
         missingUpdate = false;
         inputSelection = 0;
         inputTaskLength = 0;
+        processingDesirable = true;
+        serverPort = 0;
+        clientSocket = null;
         synchronizationObject = this;
         historyBuffer = new HistoryBuffer(0);
         randomManager = new RandomManager();
         // Handler for processing user interface updates
         handler = new Handler(Looper.getMainLooper());
         processingExecutor = Executors.newSingleThreadExecutor();
+        serverExecutor = Executors.newSingleThreadExecutor();
+        connectionLock = new ReentrantLock();
+        disconnected = connectionLock.newCondition();
+        serverFuture = null;
     }
 
     /**
@@ -232,11 +282,10 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
-     * Determines whether there is an input reader.
-     * @return true if there is an input reader
+     * Sets the input URI to null.
      */
-    public boolean hasInputReader() {
-        return inputReader != null;
+    public void resetInputUri() {
+        inputUri = null;
     }
 
     /**
@@ -247,6 +296,28 @@ public class ProcessingFragment extends Fragment {
         if (this.predictionLength != predictionLength) {
             this.predictionLength = predictionLength;
             updatePrediction();
+        }
+    }
+
+    /**
+     * Sets the flag that determines whether the generator is detected automatically..
+     * @param autoDetect automatically detect generator if true
+     */
+    public void setAutoDetect(boolean autoDetect) {
+        this.autoDetect = autoDetect;
+    }
+
+    /**
+     * Sets the server port. If a server task is running, then it is restarted.
+     * @param serverPort the new server port
+     */
+    public void setServerPort(int serverPort) {
+        if (this.serverPort != serverPort) {
+            this.serverPort = serverPort;
+            if (serverFuture != null) {
+                stopServerTask();
+                startServerTask();
+            }
         }
     }
 
@@ -270,6 +341,7 @@ public class ProcessingFragment extends Fragment {
      * Executes a clear task.
      */
     public void clear() {
+        processingDesirable = false;
         processingExecutor.execute(new ClearTask());
     }
 
@@ -292,41 +364,95 @@ public class ProcessingFragment extends Fragment {
     /**
      * Processes an input string of newline separated integers and calculates a prediction.
      * @param input the input string to be processed
-     * @param autoDetect automatically detect generator if true
      */
-    public void processInputString(String input, boolean autoDetect) {
+    public void processInputString(String input) {
         // Process input in separate thread
         prepareInputProcessing();
-        processingExecutor.execute(new ProcessInputTask(input, autoDetect));
+        processingExecutor.execute(new ProcessInputTask(input));
     }
 
     /**
      * Executes a process input task with an input reader.
-     * @param autoDetect automatically detect generator if true
      */
-    public void processInputReader(boolean autoDetect) {
+    public void processInputSocket() {
         // Process input in separate thread
         prepareInputProcessing();
-        processingExecutor.execute(new ProcessInputTask(autoDetect));
+        processingExecutor.execute(new ProcessInputTask());
     }
 
     /**
      * Opens and processes the input file pointed to by fileUri. Disables direct input.
      * @param fileUri the URI of the file to be processed
-     * @param autoDetect automatically detect generator if true
      */
-    public void processInputFile(Uri fileUri, boolean autoDetect) {
+    public void processInputFile(Uri fileUri) {
         // Process input in separate thread
         prepareInputProcessing();
-        processingExecutor.execute(new ProcessInputTask(fileUri, autoDetect));
+        processingExecutor.execute(new ProcessInputTask(fileUri));
     }
 
     /**
-     * Executes a close input reader task.
+     * Starts the server task and sets the server future.
      */
-    public void closeInputReader() {
-        // Close reader in separate thread
-        processingExecutor.execute(new CloseInputReaderTask());
+    public void startServerTask() {
+        serverFuture = serverExecutor.submit(new ServerTask());
+    }
+
+    /**
+     * Stops the server task and sets the server future to null. Closes all sockets.
+     */
+    public void stopServerTask() {
+        if (serverFuture != null) {
+            serverFuture.cancel(true);
+            serverFuture = null;
+        }
+        closeSockets();
+    }
+
+    /**
+     * Closes the client socket and the reader and writer.
+     */
+    private void closeClient() {
+        synchronized (synchronizationObject) {
+            if (inputReader != null) {
+                try {
+                    inputReader.close();
+                } catch (IOException e) {
+                    // We do not need to do anything more with the reader
+                }
+            }
+            if (outputWriter != null) {
+                try {
+                    outputWriter.close();
+                } catch (IOException e) {
+                    // We do not need to do anything more with the writer
+                }
+            }
+            if (clientSocket != null) {
+                try {
+                    clientSocket.close();
+                } catch (IOException e) {
+                    // We do not need to do anything more with the client socket
+                }
+                clientSocket = null;
+            }
+        }
+    }
+
+    /**
+     * Closes all sockets.
+     */
+    private void closeSockets() {
+        synchronized (synchronizationObject) {
+            closeClient();
+            if (serverSocket != null) {
+                try {
+                    serverSocket.close();
+                } catch (IOException e) {
+                    // We do not need to do anything more with the server socket
+                }
+                serverSocket = null;
+            }
+        }
     }
 
     /**
@@ -334,8 +460,13 @@ public class ProcessingFragment extends Fragment {
      */
     @Override
     public void onDestroy() {
+        processingDesirable = false;
+        // Shutdown server thread
+        serverExecutor.shutdownNow();
         // Shutdown processing thread
         processingExecutor.shutdownNow();
+        // Close all sockets
+        closeSockets();
         super.onDestroy();
     }
 
@@ -397,6 +528,7 @@ public class ProcessingFragment extends Fragment {
             if (!posted) {
                 missingUpdate = true;
             }
+            processingDesirable = true;
         }
     }
 
@@ -508,39 +640,31 @@ public class ProcessingFragment extends Fragment {
         private final String input;
         /** File input URI. */
         private final Uri fileUri;
-        /** Flag that determines whether the generator should be detected automatically. */
-        private final boolean autoDetect;
 
         /**
          * Constructor for processing an input string.
          * @param input the input string to be processed
-         * @param autoDetect automatically detect generator if true
          */
-        public ProcessInputTask(final String input, final boolean autoDetect) {
+        public ProcessInputTask(final String input) {
             this.input = input;
             this.fileUri = null;
-            this.autoDetect = autoDetect;
         }
 
         /**
          * Constructor for processing the input file pointed to by fileUri.
          * @param fileUri the URI of the file to be processed
-         * @param autoDetect automatically detect generator if true
          */
-        public ProcessInputTask(final Uri fileUri, final boolean autoDetect) {
+        public ProcessInputTask(final Uri fileUri) {
             this.input = null;
             this.fileUri = fileUri;
-            this.autoDetect = autoDetect;
         }
 
         /**
-         * Constructor for processing input from previous input reader.
-         * @param autoDetect automatically detect generator if true
+         * Constructor for processing input from current input reader.
          */
-        public ProcessInputTask(final boolean autoDetect) {
+        public ProcessInputTask() {
             this.input = null;
             this.fileUri = null;
-            this.autoDetect = autoDetect;
         }
 
         /**
@@ -548,29 +672,40 @@ public class ProcessingFragment extends Fragment {
          */
         @Override
         public void run() {
-            if (input != null) {
-                processInputString(input);
-            } else if (fileUri != null) {
-                processInputFile();
-            } else if (inputReader != null) {
-                processInputReader();
-            } else {
-                finishInputProcessing();
+            try {
+                if (input != null) {
+                    processInputString(input);
+                } else if (fileUri != null) {
+                    processFileInput();
+                } else if (inputReader != null) {
+                    processSocketInput();
+                }
+            } catch (NumberFormatException e) {
+                // Call listener for showing error message
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
                         if (listener != null) {
-                            listener.onProgressUpdate();
+                            listener.onInvalidInputNumber();
                         }
                     }
                 });
             }
+            finishInputProcessing();
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (listener != null) {
+                        listener.onProgressUpdate();
+                    }
+                }
+            });
         }
 
         /**
          * Opens the input reader from the inputUri and initializes processing of the reader.
          */
-        private void processInputFile() {
+        private void processFileInput() {
             inputUri = fileUri;
             try {
                 InputStream stream = getActivity().getContentResolver().openInputStream(inputUri);
@@ -579,41 +714,63 @@ public class ProcessingFragment extends Fragment {
                 abortFileInput();
                 return;
             }
-            processInputReader();
+            try {
+                while (inputReader.ready() && processingDesirable) {
+                    String nextInput = inputReader.readLine();
+                    if (nextInput == null) {
+                        break;
+                    }
+                    processInputString(nextInput);
+                }
+                inputReader.close();
+            } catch (IOException | NullPointerException e) {
+                abortFileInput();
+            }
+            try {
+                inputReader.close();
+            } catch (IOException e) {
+                // We do not need to do anything more with this inputReader
+            }
+            inputReader = null;
         }
 
         /**
          * Reads input from the input reader and assembles an input string to be processed.
          */
-        private void processInputReader() {
-            String input = "";
+        private void processSocketInput() {
+            connectionLock.lock();
             try {
-                while (inputReader.ready()) {
+                while (clientSocket != null && !clientSocket.isClosed()) {
                     String nextInput = inputReader.readLine();
                     if (nextInput == null) {
                         break;
                     }
-                    input += nextInput + "\n";
+                    try {
+                        processInputString(nextInput);
+                    } catch (NumberFormatException e) {
+                        // Call listener for showing error message
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (listener != null) {
+                                    listener.onInvalidInputNumber();
+                                }
+                            }
+                        });
+                    }
                 }
-                if (inputUri != null) {
-                    // Reset inputReader
-                    inputReader.close();
-                    InputStream stream = getActivity().getContentResolver().openInputStream(
-                            inputUri);
-                    inputReader = new BufferedReader(new InputStreamReader(stream));
-                }
+                disconnected.signal();
             } catch (IOException | NullPointerException e) {
-                abortFileInput();
-                return;
+                // Ignore exception
+            } finally {
+                connectionLock.unlock();
             }
-            processInputString(input);
         }
 
         /**
          * Aborts file input processing and updates the user interface.
          */
         private void abortFileInput() {
-            finishInputProcessing();
             if (inputReader != null) {
                 try {
                     inputReader.close();
@@ -629,7 +786,6 @@ public class ProcessingFragment extends Fragment {
                 @Override
                 public void run() {
                     if (listener != null) {
-                        listener.onProgressUpdate();
                         // Abort file input processing
                         listener.onFileInputAborted();
                     }
@@ -642,30 +798,15 @@ public class ProcessingFragment extends Fragment {
          * generator states. The generator is eventually changed if the flag autoDetect is set and a
          * better generator is detected..
          * @param input string of newline separated integers
+         * @throws NumberFormatException if input contains an invalid number string
          */
-        private void processInputString(String input) {
+        private void processInputString(String input) throws NumberFormatException {
             long[] inputNumbers;
-            try {
-                String[] stringNumbers = input.split("\n");
-                inputNumbers = new long[stringNumbers.length];
-
-                // Parse numbers
-                for (int i = 0; i < inputNumbers.length; i++) {
-                    inputNumbers[i] = Long.parseLong(stringNumbers[i]);
-                }
-            } catch (NumberFormatException e) {
-                finishInputProcessing();
-                // Call listener for showing error message
-                handler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (listener != null) {
-                            listener.onProgressUpdate();
-                            listener.onInvalidInputNumber();
-                        }
-                    }
-                });
-                return;
+            String[] stringNumbers = input.split("\n");
+            inputNumbers = new long[stringNumbers.length];
+            // Parse numbers
+            for (int i = 0; i < inputNumbers.length; i++) {
+                inputNumbers[i] = Long.parseLong(stringNumbers[i]);
             }
             long[] historyPredictionNumbers;
             long[] historyNumbers = null;
@@ -715,10 +856,8 @@ public class ProcessingFragment extends Fragment {
             boolean posted = handler.post(new Runnable() {
                 @Override
                 public void run() {
-                    finishInputProcessing();
                     // Append input numbers to history
                     if (listener != null) {
-                        listener.onProgressUpdate();
                         listener.onHistoryChanged(inputNumbers, historyPredictionNumbers);
                         listener.onPredictionChanged(predictionNumbers);
                     } else {
@@ -729,6 +868,7 @@ public class ProcessingFragment extends Fragment {
             if (!posted) {
                 missingUpdate = true;
             }
+            writeSocketOutput(predictionNumbers);
         }
 
         /**
@@ -747,13 +887,11 @@ public class ProcessingFragment extends Fragment {
                                          final long[] historyNumbers,
                                          final long[] replacedNumbers,
                                          final int bestGenerator) {
-            finishInputProcessing();
             boolean posted = handler.post(new Runnable() {
                 @Override
                 public void run() {
                     // Append input numbers to history
                     if (listener != null) {
-                        listener.onProgressUpdate();
                         listener.onGeneratorChanged(bestGenerator);
                         listener.onHistoryPredictionReplaced(historyNumbers, replacedNumbers);
                         listener.onHistoryChanged(inputNumbers, historyPredictionNumbers);
@@ -766,28 +904,28 @@ public class ProcessingFragment extends Fragment {
             if (!posted) {
                 missingUpdate = true;
             }
+            writeSocketOutput(predictionNumbers);
         }
-    }
 
-    /**
-     * This class implements a task for closing the input reader.
-     */
-    private class CloseInputReaderTask implements Runnable {
         /**
-         * Starts executing the code of the task.
+         * Writes the prediction numbers to the client socket. Writes an additional newline after
+         * the prediction block.
+         * @param predictionNumbers the predicted numbers
          */
-        @Override
-        public void run() {
-            if (inputReader != null) {
+        private void writeSocketOutput(long[] predictionNumbers) {
+            if (outputWriter != null && predictionNumbers != null) {
                 try {
-                    inputReader.close();
-                } catch (IOException e) {
-                    // We do not need to do anything more with this inputReader
+                    // Write numbers to output stream
+                    for (long number : predictionNumbers) {
+                        outputWriter.write(Long.toString(number));
+                        outputWriter.newLine();
+                    }
+                    // Finish this sequence of numbers with an additional newline
+                    outputWriter.newLine();
+                    outputWriter.flush();
+                } catch (IOException | NullPointerException e) {
+                    // Ignore unsuccessful writes
                 }
-                inputReader = null;
-            }
-            if (inputUri != null) {
-                inputUri = null;
             }
         }
     }
@@ -821,6 +959,99 @@ public class ProcessingFragment extends Fragment {
             if (!posted) {
                 missingUpdate = true;
             }
+        }
+    }
+
+    /**
+     * This class implements a task for establishing a socket connection.
+     */
+    private class ServerTask implements Runnable {
+        /**
+         * Starts executing the code of the task.
+         */
+        @Override
+        public void run() {
+            connectionLock.lock();
+            try {
+                try {
+                    serverSocket = new ServerSocket(serverPort);
+                } catch (IOException e) {
+                    abortSocketInput();
+                    return;
+                }
+                while (!Thread.currentThread().isInterrupted()) {
+                    String status;
+                    if (clientSocket == null || clientSocket.isClosed()) {
+                        try {
+                            // Display information about the server socket
+                            status = getResources().getString(R.string.server_listening) + " "
+                                    + Integer.toString(serverPort);
+                            postStatus(status);
+                            clientSocket = serverSocket.accept();
+                            status = getResources().getString(R.string.client_connected);
+                            postStatus(status);
+                            InputStream inputStream = clientSocket.getInputStream();
+                            inputReader = new BufferedReader(new InputStreamReader(inputStream));
+                            OutputStream outputStream = clientSocket.getOutputStream();
+                            outputWriter = new BufferedWriter(new OutputStreamWriter(outputStream));
+                        } catch (IOException e) {
+                            closeClient();
+                            continue;
+                        }
+                        boolean posted = handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                processInputSocket();
+                            }
+                        });
+                        if (!posted) {
+                            abortSocketInput();
+                            return;
+                        }
+                    }
+                    try {
+                        disconnected.await();
+                        closeClient();
+                        status = getResources().getString(R.string.client_disconnected);
+                        postStatus(status);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+            } finally {
+                connectionLock.unlock();
+                closeSockets();
+            }
+        }
+
+        /**
+         * Posts the current socket status to the user interface thread.
+         * @param status the status message
+         */
+        private void postStatus(final String status) {
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (listener != null) {
+                        listener.onSocketStatusChanged(status);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Aborts socket input processing and updates the user interface.
+         */
+        private void abortSocketInput() {
+            closeSockets();
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (listener != null) {
+                        listener.onSocketInputAborted();
+                    }
+                }
+            });
         }
     }
 }

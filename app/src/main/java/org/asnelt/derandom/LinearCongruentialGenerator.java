@@ -164,16 +164,19 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * Returns the following predictions without updating the state of the generator.
      * @param number numbers of values to predict
      * @return predicted values
+     * @throws IllegalArgumentException if number is less than zero
      */
     @Override
-    public long[] peekNext(int number) {
+    public long[] peekNext(int number) throws IllegalArgumentException {
+        if (number < 0) {
+            throw new IllegalArgumentException();
+        }
         long[] randomNumbers = new long[number];
-        long peek_state = state;
-
+        long peekState = state;
         for (int i = 0; i < number; i++) {
-            peek_state = nextState(peek_state);
+            peekState = nextState(peekState);
             // Set output bits
-            randomNumbers[i] = calculateOutput(peek_state);
+            randomNumbers[i] = calculateOutput(peekState);
         }
         return randomNumbers;
     }
@@ -216,7 +219,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @return next prediction
      */
     @Override
-    protected long next() {
+    public long next() {
         state = nextState(state);
         return calculateOutput(state);
     }
@@ -246,7 +249,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
                 }
             }
         }
-        // No option found; just return successor as state
+        // No option found, so just return successor as state
         return successor;
     }
 

@@ -47,8 +47,9 @@ public abstract class RandomNumberGenerator {
      * Returns the following predictions without updating the state of the generator.
      * @param number number of values to predict
      * @return predicted values
+     * @throws IllegalArgumentException if number is less than zero
      */
-    public abstract long[] peekNext(int number);
+    public abstract long[] peekNext(int number) throws IllegalArgumentException;
 
     /**
      * Find prediction numbers that match the input series and update the state accordingly.
@@ -62,5 +63,22 @@ public abstract class RandomNumberGenerator {
      * Generates the next prediction and updates the state accordingly.
      * @return next prediction
      */
-    protected abstract long next();
+    public abstract long next();
+
+    /**
+     * Generates the following predictions and updates the state accordingly.
+     * @param number number of values to predict
+     * @return predicted values
+     * @throws IllegalArgumentException if number is less than zero
+     */
+    public long[] next(int number) throws IllegalArgumentException {
+        if (number < 0) {
+            throw new IllegalArgumentException();
+        }
+        long[] predictions = new long[number];
+        for (int i = 0; i < number; i++) {
+            predictions[i] = next();
+        }
+        return predictions;
+    }
 }

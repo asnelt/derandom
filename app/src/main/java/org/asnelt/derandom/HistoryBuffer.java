@@ -52,7 +52,7 @@ public class HistoryBuffer {
     /**
      * Sets the maximum number of elements the buffer can hold. This number must be non-negative.
      * @param capacity the new capacity
-     * @throws IllegalArgumentException
+     * @throws IllegalArgumentException if the capacity is less than zero
      */
     public void setCapacity(int capacity) throws IllegalArgumentException {
         if (capacity < 0) {
@@ -114,7 +114,7 @@ public class HistoryBuffer {
     /**
      * Returns the element that was last put into the buffer.
      * @return the number that was last put into the buffer
-     * @throws BufferUnderflowException
+     * @throws BufferUnderflowException if the buffer is empty
      */
     public long getLast() throws BufferUnderflowException {
         if (tail < 0) {
@@ -128,7 +128,7 @@ public class HistoryBuffer {
      * Returns the elements that were last put into the buffer.
      * @param range the number of elements to return
      * @return the numbers that were last put into the buffer
-     * @throws BufferUnderflowException
+     * @throws BufferUnderflowException if range is greater than the number of buffer elements
      */
     public long[] getLast(int range) throws BufferUnderflowException {
         if (range > length()) {
