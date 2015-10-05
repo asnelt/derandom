@@ -16,15 +16,20 @@
 
 package org.asnelt.derandom;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.text.InputType;
@@ -70,6 +75,9 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     private static final int INDEX_FILE_INPUT = 1;
     /** spinnerInput item position of socket input selection. */
     private static final int INDEX_SOCKET_INPUT = 2;
+
+    /** Permission request code for reading external storage. */
+    private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 0;
 
     /** Field for displaying previously entered numbers. */
     private HistoryView textHistoryInput;
@@ -184,6 +192,9 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
         // Apply the adapter to the spinner
         spinnerInput.setAdapter(spinnerInputAdapter);
         spinnerInput.setOnItemSelectedListener(this);
+        if (spinnerInput.getSelectedItemPosition() != processingFragment.getInputSelection()) {
+            spinnerInput.setSelection(processingFragment.getInputSelection());
+        }
 
         // Create an ArrayAdapter using the string array and a default spinner layout
         String[] generatorNames = processingFragment.getGeneratorNames();
@@ -286,6 +297,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      * @param pos the position of the view in the spinner
      * @param id the row id of the item that was selected
      */
+    @SuppressLint("InlinedApi")
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
         // Check which spinner was used
@@ -299,17 +311,21 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
                     processingFragment.resetInputUri();
                     enableDirectInput();
                 }
-                processingFragment.setInputSelection(pos);
             } else if (pos == INDEX_FILE_INPUT) {
                 if (processingFragment.getInputSelection() != INDEX_FILE_INPUT) {
                     if (processingFragment.getInputSelection() == INDEX_SOCKET_INPUT) {
                         processingFragment.stopServerTask();
                     }
-                    selectTextFile();
                     processingFragment.setInputSelection(pos);
-                } else {
-                    if (processingFragment.getInputUri() == null) {
-                        enableDirectInput();
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                            || ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.READ_EXTERNAL_STORAGE)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        selectTextFile();
+                    } else {
+                        ActivityCompat.requestPermissions(this,
+                                new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                                MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
                     }
                 }
             } else if (pos == INDEX_SOCKET_INPUT) {
@@ -335,6 +351,24 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      */
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
+    }
+
+    /**
+     * Called in response to a permission request.
+     * @param requestCode code of the permission request
+     * @param permissions the requested permissions
+     * @param grantResults the granted results for the corresponding permissions
+     */
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[],
+                                           @NonNull int[] grantResults) {
+        if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                selectTextFile();
+            } else {
+                enableDirectInput();
+            }
+        }
     }
 
     /**
@@ -554,7 +588,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
         View inflater = getLayoutInflater().inflate(R.layout.dialog_about, null);
 
         TextView textVersion = (TextView)inflater.findViewById(R.id.text_version);
-        textVersion.setText(textVersion.getText().toString() + " " + versionName);
+        textVersion.setText(String.format("%s %s", textVersion.getText().toString(), versionName));
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setIcon(R.drawable.ic_launcher);
@@ -588,6 +622,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     private void enableDirectInput() {
         textInput.setText("");
         textInput.setEnabled(true);
+        processingFragment.setInputSelection(INDEX_DIRECT_INPUT);
         // Set spinner selection to direct input
         if (spinnerInput.getSelectedItemPosition() != INDEX_DIRECT_INPUT) {
             spinnerInput.setSelection(INDEX_DIRECT_INPUT);

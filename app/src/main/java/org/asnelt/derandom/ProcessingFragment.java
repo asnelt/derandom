@@ -16,7 +16,7 @@
 
 package org.asnelt.derandom;
 
-import android.app.Activity;
+import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -197,12 +197,14 @@ public class ProcessingFragment extends Fragment {
 
     /**
      * Called when the fragment is associated with an activity.
-     * @param activity the activity the fragment is associated with
+     * @param context the context the fragment is associated with
      */
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-        listener = (ProcessingFragmentListener) activity;
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        if (context instanceof MainActivity) {
+            listener = (ProcessingFragmentListener) context;
+        }
     }
 
     /**
@@ -709,6 +711,9 @@ public class ProcessingFragment extends Fragment {
             inputUri = fileUri;
             try {
                 InputStream stream = getActivity().getContentResolver().openInputStream(inputUri);
+                if (stream == null) {
+                    throw new NullPointerException();
+                }
                 inputReader = new BufferedReader(new InputStreamReader(stream));
             } catch (FileNotFoundException | NullPointerException e) {
                 abortFileInput();

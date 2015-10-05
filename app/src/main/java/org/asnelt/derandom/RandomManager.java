@@ -157,6 +157,81 @@ public class RandomManager {
             47,
             16
     };
+    /** Names of all Mersenne Twisters. */
+    private static final String[] MT_NAMES = {
+            "MT: MT19937",
+            "MT: MT19937-64"
+    };
+    /** Word sizes of all Mersenne Twisters. */
+    private static final int[] MT_WORD_SIZES = {
+            32,
+            64
+    };
+    /** Numbers of state elements of all Mersenne Twisters. */
+    private static final int[] MT_STATE_SIZES = {
+            624,
+            312
+    };
+    /** Shift size parameters of all Mersenne Twisters. */
+    private static final int[] MT_SHIFT_SIZES = {
+            397,
+            156
+    };
+    /** Numbers of lower mask bits of all Mersenne Twisters. */
+    private static final int[] MT_MASK_BITS = {
+            31,
+            31
+    };
+    /** Twist masks of all Mersenne Twisters. */
+    private static final long[] MT_TWIST_MASKS = {
+            0x9908B0DFL,
+            0xB5026F5AA96619E9L
+    };
+    /** Tempering u parameters of all Mersenne Twisters. */
+    private static final int[] MT_TEMPERING_US = {
+            11,
+            29
+    };
+    /** Tempering d parameters of all Mersenne Twisters. */
+    private static final long[] MT_TEMPERING_DS = {
+            0xFFFFFFFFL,
+            0x5555555555555555L
+    };
+    /** Tempering s parameters of all Mersenne Twisters. */
+    private static final int[] MT_TEMPERING_SS = {
+            7,
+            17
+    };
+    /** Tempering b parameters of all Mersenne Twisters. */
+    private static final long[] MT_TEMPERING_BS = {
+            0x9D2C5680L,
+            0x71D67FFFEDA60000L
+    };
+    /** Tempering t parameters of all Mersenne Twisters. */
+    private static final int[] MT_TEMPERING_TS = {
+            15,
+            37
+    };
+    /** Tempering c parameters of all Mersenne Twisters. */
+    private static final long[] MT_TEMPERING_CS = {
+            0xEFC60000L,
+            0xFFF7EEE000000000L
+    };
+    /** Tempering l parameters of all Mersenne Twisters. */
+    private static final int[] MT_TEMPERING_LS = {
+            18,
+            43
+    };
+    /** Initialization multipliers of all Mersenne Twisters. */
+    private static final long[] MT_INITIALIZATION_MULTIPLIERS = {
+            1812433253L,
+            6364136223846793005L
+    };
+    /** Default seeds of all Mersenne Twisters. */
+    private static final long[] MT_DEFAULT_SEEDS = {
+            5489L,
+            5489L
+    };
     /** Index of currently active generator. */
     private volatile int currentGenerator;
     /** Best prediction for the latest incoming numbers. */
@@ -167,30 +242,10 @@ public class RandomManager {
      */
     public RandomManager() {
         this.generators = new AtomicReferenceArray<>(0);
-        initLinearCongruentialGenerators();
+        initializeLinearCongruentialGenerators();
+        initializeMersenneTwisters();
         this.currentGenerator = 0;
         incomingPredictionNumbers = new long[0];
-    }
-
-    /**
-     * Initializes all linear congruential generators.
-     */
-    protected void initLinearCongruentialGenerators() {
-        AtomicReferenceArray<RandomNumberGenerator> generators;
-
-        generators = new AtomicReferenceArray<>(this.generators.length() + LCG_NAMES.length);
-        // Copy previous generators into new array
-        for (int i = 0; i < this.generators.length(); i++) {
-            generators.set(i, this.generators.get(i));
-        }
-        // Construct new generators
-        for (int i = 0; i < LCG_NAMES.length; i++) {
-            generators.set(this.generators.length() + i, new LinearCongruentialGenerator(
-                    LCG_NAMES[i], LCG_MULTIPLIERS[i], LCG_INCREMENTS[i], LCG_MODULI[i],
-                    LCG_SEEDS[i], LCG_BIT_RANGE_STARTS[i], LCG_BIT_RANGE_STOPS[i]));
-        }
-
-        this.generators = generators;
     }
 
     /**
@@ -342,5 +397,54 @@ public class RandomManager {
      */
     public long[] getIncomingPredictionNumbers() {
         return incomingPredictionNumbers;
+    }
+
+    /**
+     * Initializes all linear congruential generators.
+     */
+    private void initializeLinearCongruentialGenerators() {
+        AtomicReferenceArray<RandomNumberGenerator> generators;
+
+        generators = new AtomicReferenceArray<>(this.generators.length() + LCG_NAMES.length);
+        // Copy previous generators into new array
+        for (int i = 0; i < this.generators.length(); i++) {
+            generators.set(i, this.generators.get(i));
+        }
+        // Construct new generators
+        for (int i = 0; i < LCG_NAMES.length; i++) {
+            generators.set(this.generators.length() + i, new LinearCongruentialGenerator(
+                    LCG_NAMES[i], LCG_MULTIPLIERS[i], LCG_INCREMENTS[i], LCG_MODULI[i],
+                    LCG_SEEDS[i], LCG_BIT_RANGE_STARTS[i], LCG_BIT_RANGE_STOPS[i]));
+        }
+
+        this.generators = generators;
+    }
+
+    /**
+     * Initializes all Mersenne Twisters.
+     */
+    private void initializeMersenneTwisters() {
+        AtomicReferenceArray<RandomNumberGenerator> generators;
+
+        generators = new AtomicReferenceArray<>(this.generators.length() + MT_NAMES.length);
+        // Copy previous generators into new array
+        for (int i = 0; i < this.generators.length(); i++) {
+            generators.set(i, this.generators.get(i));
+        }
+        // Construct new generators
+        for (int i = 0; i < MT_NAMES.length; i++) {
+                try {
+                    generators.set(this.generators.length() + i, new MersenneTwister(
+                            MT_NAMES[i], MT_WORD_SIZES[i], MT_STATE_SIZES[i], MT_SHIFT_SIZES[i],
+                            MT_MASK_BITS[i], MT_TWIST_MASKS[i], MT_TEMPERING_US[i], MT_TEMPERING_DS[i],
+                            MT_TEMPERING_SS[i], MT_TEMPERING_BS[i], MT_TEMPERING_TS[i], MT_TEMPERING_CS[i],
+                            MT_TEMPERING_LS[i], MT_INITIALIZATION_MULTIPLIERS[i], MT_DEFAULT_SEEDS[i]));
+                } catch (OutOfMemoryError e) {
+                    // Not enough memory for Mersenne Twisters
+                    return;
+                }
+        }
+
+        this.generators = generators;
     }
 }

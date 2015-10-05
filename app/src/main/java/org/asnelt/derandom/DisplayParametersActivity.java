@@ -54,6 +54,10 @@ public class DisplayParametersActivity extends AppCompatActivity {
         String[] parameterNames =
                 extras.getStringArray(MainActivity.EXTRA_GENERATOR_PARAMETER_NAMES);
         long[] parameters = extras.getLongArray(MainActivity.EXTRA_GENERATOR_PARAMETERS);
+        if (parameterNames == null || parameters == null) {
+            parameterNames = new String[0];
+            parameters = new long[0];
+        }
 
         ScrollView scrollViewParameters = (ScrollView) view.findViewById(
                 R.id.scroll_view_parameters);
@@ -69,12 +73,15 @@ public class DisplayParametersActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         String parameterBase = sharedPreferences.getString(SettingsActivity.KEY_PREF_PARAMETER_BASE,
                 "");
-        assert parameterBase != null;
 
-        TextView[] textParameterNames = new TextView[parameterNames.length];
+        int parametersLength = parameters.length;
+        if (parameterNames.length < parametersLength) {
+            parametersLength = parameterNames.length;
+        }
+        TextView[] textParameterNames = new TextView[parametersLength];
         // Add fields for parameters
-        EditText[] textParameters = new EditText[parameters.length];
-        for (int i = 0; i < parameterNames.length; i++) {
+        EditText[] textParameters = new EditText[parametersLength];
+        for (int i = 0; i < parametersLength; i++) {
             textParameterNames[i] = new TextView(this);
             textParameterNames[i].setText(parameterNames[i]);
             layoutParameters.addView(textParameterNames[i]);
@@ -82,10 +89,12 @@ public class DisplayParametersActivity extends AppCompatActivity {
             textParameters[i] = new EditText(this);
             switch (parameterBase) {
                 case "8":
-                    textParameters[i].setText("0" + Long.toOctalString(parameters[i]));
+                    textParameters[i].setText(String.format("0%s",
+                            Long.toOctalString(parameters[i])));
                     break;
                 case "16":
-                    textParameters[i].setText("0x" + Long.toHexString(parameters[i]));
+                    textParameters[i].setText(String.format("0x%s",
+                            Long.toHexString(parameters[i])));
                     break;
                 default:
                     String unsignedLongString;

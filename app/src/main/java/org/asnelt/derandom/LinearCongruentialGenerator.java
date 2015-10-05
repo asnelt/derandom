@@ -37,10 +37,6 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
     private final long modulus;
     /** Human readable name of modulus parameter. */
     private static final String MODULUS_NAME = "Modulus";
-    /** State parameter. */
-    private volatile long state;
-    /** Human readable name of state parameter. */
-    private static final String STATE_NAME = "State";
     /** Index of start bit for output. */
     private final int bitRangeStart;
     /** Human readable name of bit range start parameter. */
@@ -49,15 +45,19 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
     private final int bitRangeStop;
     /** Human readable name of bit range stop parameter. */
     private static final String BIT_RANGE_STOP_NAME = "Bit range stop";
+    /** Human readable name of state. */
+    private static final String STATE_NAME = "State";
     /** Human readable names of all free parameters. */
     private static final String[] PARAMETER_NAMES = {
-        MULTIPLIER_NAME, INCREMENT_NAME, MODULUS_NAME, STATE_NAME, BIT_RANGE_START_NAME,
-            BIT_RANGE_STOP_NAME
+            MULTIPLIER_NAME, INCREMENT_NAME, MODULUS_NAME, BIT_RANGE_START_NAME,
+            BIT_RANGE_STOP_NAME, STATE_NAME
     };
     /** The parameter names as a list. */
     private static final List PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
     /** Two complement bit extension for negative integers. */
     private static final long COMPLEMENT_INTEGER_EXTENSION = 0xFFFFFFFF00000000L;
+    /** Internal state. */
+    private volatile long state;
     /** Index of most significant modulus bit. */
     private final int modulusBitRangeStop;
     /** Initial seed of the generator. */
@@ -89,8 +89,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
         this.state = seed;
         // Check index range
         if (bitRangeStart < 0) {
-            throw new IllegalArgumentException(
-                    "bitRangeStart must not be negative");
+            throw new IllegalArgumentException("bitRangeStart must not be negative");
         }
         if (bitRangeStop > Long.SIZE - 1) {
             throw new IllegalArgumentException(
@@ -122,7 +121,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * Sets the state of the generator.
      * @param state the complete state of the generator
      */
-    public void setState(long state) {
+    public synchronized void setState(long state) {
         this.state = state;
     }
 
@@ -154,9 +153,9 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
         parameters[PARAMETER_NAMES_LIST.indexOf(MULTIPLIER_NAME)] = multiplier;
         parameters[PARAMETER_NAMES_LIST.indexOf(INCREMENT_NAME)] = increment;
         parameters[PARAMETER_NAMES_LIST.indexOf(MODULUS_NAME)] = modulus;
-        parameters[PARAMETER_NAMES_LIST.indexOf(STATE_NAME)] = state;
         parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_START_NAME)] = (long) bitRangeStart;
         parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_STOP_NAME)] = (long) bitRangeStop;
+        parameters[PARAMETER_NAMES_LIST.indexOf(STATE_NAME)] = state;
         return parameters;
     }
 
@@ -188,7 +187,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @return predicted numbers that best match input series
      */
     @Override
-    public long[] findSeries(long[] incomingNumbers, HistoryBuffer historyBuffer) {
+    public synchronized long[] findSeries(long[] incomingNumbers, HistoryBuffer historyBuffer) {
         long[] predicted = new long[incomingNumbers.length];
         if (incomingNumbers.length == 0) {
             // Empty input
@@ -219,7 +218,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @return next prediction
      */
     @Override
-    public long next() {
+    public synchronized long next() {
         state = nextState(state);
         return calculateOutput(state);
     }

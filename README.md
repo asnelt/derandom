@@ -9,8 +9,8 @@ Usage
 
 Enter a sequence of numbers that you obtained from a pseudo random number
 generator like, for instance, the Java standard pseudo random number
-generator.  The app will then try to predict following numbers from the
-generator.
+generator or the Mersenne Twister MT19937.  The app will then try to
+predict following numbers from the generator.
 
 Three input modes are supported:
 
@@ -21,6 +21,8 @@ with a custom client by means of a client socket and send newline
 separated number strings to the server.  After each number the server
 will send back the next newline separated predictions.  Each block of
 predictions is separated by an additional newline.
+
+The app expects all numbers to be in a signed integer format.
 
 
 Building from source
