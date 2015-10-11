@@ -55,7 +55,7 @@ for i in range(0, 700):
     # conversion to signed 32 bit integer
     if (r & 0x80000000):
         r = -0x100000000 + r
-    s.sendall(str(r)+'\\n') # send number string
+    s.sendall(str(r)+'\n') # send number string
     # read and print predictions
     for j in range(0, 9): # 8 predictions and newline
         l = fs.readline()
