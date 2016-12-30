@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -110,6 +110,7 @@ public class DisplayParametersActivity extends AppCompatActivity {
             textParameters[i].setInputType(InputType.TYPE_CLASS_NUMBER);
             // Remove the following line to make fields editable
             textParameters[i].setKeyListener(null);
+            textParameters[i].setEnabled(false);
             layoutParameters.addView(textParameters[i]);
         }
         scrollViewParameters.addView(layoutParameters);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ package org.asnelt.derandom;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
+import android.app.Dialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -31,6 +32,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBar;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.text.InputType;
 import android.text.Layout;
@@ -84,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     /** Field for displaying predictions for previous numbers. */
     private HistoryView textHistoryPrediction;
     /** Field for displaying predictions. */
-    private TextView textPrediction;
+    private NumberSequenceView textPrediction;
     /** Field for entering input. */
     private EditText textInput;
     /** Spinner for selecting the input method. */
@@ -110,7 +112,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
         textHistoryInput.setHistoryViewListener(this);
         textHistoryPrediction = (HistoryView) findViewById(R.id.text_history_prediction);
         textHistoryPrediction.setHistoryViewListener(this);
-        textPrediction = (TextView) findViewById(R.id.text_prediction);
+        textPrediction = (NumberSequenceView) findViewById(R.id.text_prediction);
         textInput = (EditText) findViewById(R.id.text_input);
         spinnerInput = (Spinner) findViewById(R.id.spinner_input);
         spinnerGenerator = (Spinner) findViewById(R.id.spinner_generator);
@@ -127,7 +129,6 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.setDisplayShowHomeEnabled(true);
-            actionBar.setIcon(R.drawable.ic_launcher);
         }
 
         FragmentManager fragmentManager = getSupportFragmentManager();
@@ -268,22 +269,23 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_refresh:
-                processInput();
+                if (processingFragment.getInputSelection() == INDEX_FILE_INPUT) {
+                    selectTextFile();
+                } else {
+                    processInput();
+                }
                 return true;
             case R.id.action_discard:
                 clearInput();
                 return true;
             case R.id.action_parameters:
-                openParameters();
+                openActivityParameters();
                 return true;
             case R.id.action_settings:
-                openSettings();
+                openActivitySettings();
                 return true;
             case R.id.action_about:
-                openAbout();
-                return true;
-            case R.id.action_exit:
-                finish();
+                openDialogAbout();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -393,10 +395,10 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      * @param historyNumbers previously entered numbers
      * @param historyPredictionNumbers predictions for previous numbers
      */
-    public void onHistoryPredictionReplaced(long[] historyNumbers,
-                                            long[] historyPredictionNumbers) {
+    public void onHistoryPredictionReplaced(NumberSequence historyNumbers,
+                                            NumberSequence historyPredictionNumbers) {
         textHistoryPrediction.clear();
-        textHistoryPrediction.appendNumbers(historyPredictionNumbers, historyNumbers);
+        textHistoryPrediction.append(historyPredictionNumbers, historyNumbers);
     }
 
     /**
@@ -413,28 +415,23 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      * @param inputNumbers the entered numbers
      * @param predictionNumbers predictions for entered numbers
      */
-    public void onHistoryChanged(long[] inputNumbers, long[] predictionNumbers) {
+    public void onHistoryChanged(NumberSequence inputNumbers, NumberSequence predictionNumbers) {
         // Appends input numbers to history
-        textHistoryInput.appendNumbers(inputNumbers);
-        textHistoryPrediction.appendNumbers(predictionNumbers, inputNumbers);
+        textHistoryInput.append(inputNumbers);
+        textHistoryPrediction.append(predictionNumbers, inputNumbers);
     }
 
     /**
      * Called when the predictions for upcoming numbers changed.
      * @param predictionNumbers predictions of upcoming numbers
      */
-    public void onPredictionChanged(long[] predictionNumbers) {
-        textPrediction.setText("");
+    public void onPredictionChanged(NumberSequence predictionNumbers) {
+        textPrediction.clear();
         if (predictionNumbers == null) {
             return;
         }
         // Append numbers
-        for (int i = 0; i < predictionNumbers.length; i++) {
-            if (i > 0) {
-                textPrediction.append("\n");
-            }
-            textPrediction.append(Long.toString(predictionNumbers[i]));
-        }
+        textPrediction.append(predictionNumbers);
         textPrediction.scrollTo(0, 0);
     }
 
@@ -445,7 +442,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     public void onFileInputAborted() {
         enableDirectInput();
         String errorMessage = getResources().getString(R.string.file_error_message);
-        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+        Toast.makeText(getApplicationContext(), errorMessage, Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -455,7 +452,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     public void onSocketInputAborted() {
         enableDirectInput();
         String errorMessage = getResources().getString(R.string.socket_error_message);
-        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+        Toast.makeText(getApplicationContext(), errorMessage, Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -463,7 +460,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      */
     public void onInvalidInputNumber() {
         String errorMessage = getResources().getString(R.string.number_error_message);
-        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+        Toast.makeText(getApplicationContext(), errorMessage, Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -472,7 +469,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     public void onClear() {
         textHistoryInput.clear();
         textHistoryPrediction.clear();
-        textPrediction.setText("");
+        textPrediction.clear();
         if (processingFragment.getInputSelection() == INDEX_DIRECT_INPUT) {
             // Direct input; reset textInput
             textInput.setText("");
@@ -547,11 +544,11 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     private void clearInput() {
         processingFragment.clear();
     }
-	
+
     /**
      * Show generator parameters in a new activity. Called when the user clicks the parameters item.
      */
-    private void openParameters() {
+    private void openActivityParameters() {
         String name = processingFragment.getCurrentGeneratorName();
         String[] parameterNames = processingFragment.getCurrentParameterNames();
         long[] parameters = processingFragment.getCurrentParameters();
@@ -567,7 +564,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     /**
      * Called when the user clicks the settings item.
      */
-    private void openSettings() {
+    private void openActivitySettings() {
         // Start new settings activity
         Intent intent = new Intent(this, SettingsActivity.class);
         startActivity(intent);
@@ -576,7 +573,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     /**
      * Opens an about dialog. Called when the user clicks the about item.
      */
-    private void openAbout() {
+    private void openDialogAbout() {
         // Construct an about dialog
         String versionName;
         try {
@@ -584,17 +581,25 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
         } catch (PackageManager.NameNotFoundException e) {
             versionName = "unknown";
         }
+
         @SuppressLint("InflateParams")
         View inflater = getLayoutInflater().inflate(R.layout.dialog_about, null);
 
-        TextView textVersion = (TextView)inflater.findViewById(R.id.text_version);
+        TextView textVersion = (TextView) inflater.findViewById(R.id.text_version);
         textVersion.setText(String.format("%s %s", textVersion.getText().toString(), versionName));
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setIcon(R.drawable.ic_launcher);
-        builder.setTitle("About " + getResources().getString(R.string.app_name));
+        builder.setTitle(getResources().getString(R.string.title_dialog_about) + " "
+                + getResources().getString(R.string.app_name));
         builder.setView(inflater);
         builder.create();
+        builder.setPositiveButton(R.string.about_positive, new Dialog.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
         builder.show();
     }
 

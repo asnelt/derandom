@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import java.nio.BufferUnderflowException;
 /**
  * This class implements a ring buffer for storing long numbers.
  */
-public class HistoryBuffer {
+class HistoryBuffer {
     /** The maximum number of elements in the buffer. */
     private int capacity;
     /** The array for storing the elements. */
@@ -35,7 +35,7 @@ public class HistoryBuffer {
      * Constructs an empty buffer with a given capacity.
      * @param capacity the maximum number of elements the buffer can hold
      */
-    public HistoryBuffer(int capacity) {
+    HistoryBuffer(int capacity) {
         clear();
         setCapacity(capacity);
     }
@@ -43,7 +43,7 @@ public class HistoryBuffer {
     /**
      * Removes all elements from the buffer.
      */
-    public void clear() {
+    void clear() {
         head = 0;
         tail = -1;
         numbers = new long[0];
@@ -54,7 +54,7 @@ public class HistoryBuffer {
      * @param capacity the new capacity
      * @throws IllegalArgumentException if the capacity is less than zero
      */
-    public void setCapacity(int capacity) throws IllegalArgumentException {
+    void setCapacity(int capacity) throws IllegalArgumentException {
         if (capacity < 0) {
             throw new IllegalArgumentException("capacity must not be negative");
         }
@@ -77,7 +77,7 @@ public class HistoryBuffer {
      * Puts new elements into the buffer.
      * @param incomingNumbers the numbers to store
      */
-    public void put(long[] incomingNumbers) {
+    void put(long[] incomingNumbers) {
         if (incomingNumbers.length == 0) {
             return;
         }
@@ -116,7 +116,7 @@ public class HistoryBuffer {
      * @return the number that was last put into the buffer
      * @throws BufferUnderflowException if the buffer is empty
      */
-    public long getLast() throws BufferUnderflowException {
+    long getLast() throws BufferUnderflowException {
         if (tail < 0) {
             // Empty buffer
             throw new BufferUnderflowException();
@@ -130,7 +130,7 @@ public class HistoryBuffer {
      * @return the numbers that were last put into the buffer
      * @throws BufferUnderflowException if range is greater than the number of buffer elements
      */
-    public long[] getLast(int range) throws BufferUnderflowException {
+    private long[] getLast(int range) throws BufferUnderflowException {
         if (range > length()) {
             throw new BufferUnderflowException();
         }
@@ -151,7 +151,7 @@ public class HistoryBuffer {
      * Returns all elements that are stored in the buffer
      * @return all elements in the buffer
      */
-    public long[] toArray() {
+    long[] toArray() {
         return getLast(length());
     }
 

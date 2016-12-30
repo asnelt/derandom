@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 /**
  * Manages all random number generators.
  */
-public class RandomManager {
+class RandomManager {
     /** Random number generators. */
     private volatile AtomicReferenceArray<RandomNumberGenerator> generators;
     /** Names of all linear congruential generators. */
@@ -233,26 +233,26 @@ public class RandomManager {
             5489L
     };
     /** Index of currently active generator. */
-    private volatile int currentGenerator;
+    private volatile int currentGeneratorIndex;
     /** Best prediction for the latest incoming numbers. */
-    private volatile long[] incomingPredictionNumbers;
+    private volatile NumberSequence incomingPredictionNumbers;
 
     /**
-     * Constructor initializing all random numbers generators.
+     * Constructor initializing all random number generators.
      */
-    public RandomManager() {
+    RandomManager() {
         this.generators = new AtomicReferenceArray<>(0);
         initializeLinearCongruentialGenerators();
         initializeMersenneTwisters();
-        this.currentGenerator = 0;
-        incomingPredictionNumbers = new long[0];
+        this.currentGeneratorIndex = 0;
+        incomingPredictionNumbers = new NumberSequence();
     }
 
     /**
      * Returns human readable names of all generators.
      * @return all generator names
      */
-    public String[] getGeneratorNames() {
+    String[] getGeneratorNames() {
         String[] names = new String[generators.length()];
 
         for (int i = 0; i < generators.length(); i++) {
@@ -265,28 +265,28 @@ public class RandomManager {
     /**
      * Resets the state of the current generator.
      */
-    public void resetCurrentGenerator() {
-        generators.get(currentGenerator).reset();
+    void resetCurrentGenerator() {
+        generators.get(currentGeneratorIndex).reset();
     }
 
     /**
      * Resets the random manager including the states of all generators.
      */
-    public void reset() {
+    void reset() {
         for (int i = 0; i < generators.length(); i++) {
             generators.get(i).reset();
         }
-        currentGenerator = 0;
-        incomingPredictionNumbers = new long[0];
+        currentGeneratorIndex = 0;
+        incomingPredictionNumbers = new NumberSequence();
     }
 
     /**
      * Sets the currently active generator.
-     * @param number index of the currently active generator
+     * @param index index of the currently active generator
      */
-    public void setCurrentGenerator(int number) {
-        if (number >= 0 && number < generators.length()) {
-            currentGenerator = number;
+    void setCurrentGeneratorIndex(int index) {
+        if (index >= 0 && index < generators.length()) {
+            currentGeneratorIndex = index;
         }
     }
 
@@ -294,32 +294,32 @@ public class RandomManager {
      * Returns the index of the currently active generator.
      * @return index of the currently active generator
      */
-    public int getCurrentGenerator() {
-        return currentGenerator;
+    int getCurrentGeneratorIndex() {
+        return currentGeneratorIndex;
     }
 
     /**
      * Returns the name of the currently active generator.
      * @return name of the currently active generator
      */
-    public String getCurrentGeneratorName() {
-        return generators.get(currentGenerator).getName();
+    String getCurrentGeneratorName() {
+        return generators.get(currentGeneratorIndex).getName();
     }
 
     /**
      * Returns the parameter names of the currently active generator.
      * @return all parameter names of the currently active generator
      */
-    public String[] getCurrentParameterNames() {
-        return generators.get(currentGenerator).getParameterNames();
+    String[] getCurrentParameterNames() {
+        return generators.get(currentGeneratorIndex).getParameterNames();
     }
 
     /**
      * Returns all parameter values of the currently active generator.
      * @return parameter values of the currently active generator
      */
-    public long[] getCurrentParameters() {
-        return generators.get(currentGenerator).getParameters();
+    long[] getCurrentParameters() {
+        return generators.get(currentGeneratorIndex).getParameters();
     }
 
     /**
@@ -327,19 +327,19 @@ public class RandomManager {
      * @param number number of values to predict
      * @return predictions
      */
-    public long[] predict(int number) {
-        return generators.get(currentGenerator).peekNext(number);
+    NumberSequence predict(int number, NumberSequence.NumberType numberType) {
+        return generators.get(currentGeneratorIndex).peekNextOutputs(number, numberType);
     }
 
     /**
-     * Find prediction numbers of the currently active generator that match the input series and
+     * Find prediction numbers of the currently active generator that match the input sequence and
      * update the state and incomingPredictionNumbers accordingly.
      * @param incomingNumbers new input numbers
      * @param historyBuffer previous input numbers
      */
-    public void findCurrentSeries(long[] incomingNumbers, HistoryBuffer historyBuffer) {
+    void findCurrentSequence(NumberSequence incomingNumbers, HistoryBuffer historyBuffer) {
         incomingPredictionNumbers =
-                generators.get(currentGenerator).findSeries(incomingNumbers, historyBuffer);
+                generators.get(currentGeneratorIndex).findSequence(incomingNumbers, historyBuffer);
     }
 
     /**
@@ -349,54 +349,55 @@ public class RandomManager {
      * @param historyBuffer previous input numbers
      * @return index of the best matching generator
      */
-    public int detectGenerator(long[] incomingNumbers, HistoryBuffer historyBuffer) {
+    int detectGenerator(NumberSequence incomingNumbers, HistoryBuffer historyBuffer) {
         // Check whether the current generator predicts the incoming numbers
-        long[] prediction = predict(incomingNumbers.length);
-        boolean anyFailure = false;
-        for (int i = 0; i < prediction.length; i++) {
-            if (prediction[i] != incomingNumbers[i]) {
-                anyFailure = true;
-                break;
-            }
-        }
-        if (!anyFailure) {
+        NumberSequence prediction = predict(incomingNumbers.length(),
+                incomingNumbers.getNumberType());
+        if (prediction.equals(incomingNumbers)) {
             // Keep current generator
-            incomingPredictionNumbers = generators.get(currentGenerator).next(
-                    incomingNumbers.length);
-            return currentGenerator;
+            incomingPredictionNumbers = generators.get(currentGeneratorIndex).nextOutputs(
+                    incomingNumbers.length(), incomingNumbers.getNumberType());
+            return currentGeneratorIndex;
         }
         // Evaluate prediction quality for all generators
         int bestScore = 0;
-        int bestGenerator = currentGenerator;
+        int bestGeneratorIndex = currentGeneratorIndex;
         for (int i = 0; i < generators.length(); i++) {
-            prediction = generators.get(i).findSeries(incomingNumbers, historyBuffer);
-            int score = 0;
-            for (int j = 0; j < prediction.length; j++) {
-                if (prediction[j] == incomingNumbers[j]) {
-                    score++;
-                }
+            if (!generators.get(i).isActive()) {
+                continue;
             }
+            prediction = generators.get(i).findSequence(incomingNumbers, historyBuffer);
+            int score = prediction.countMatchesWith(incomingNumbers);
             if (score > bestScore) {
                 bestScore = score;
-                bestGenerator = i;
+                bestGeneratorIndex = i;
             }
-            if (i == currentGenerator) {
+            if (i == currentGeneratorIndex) {
                 if (score == bestScore) {
                     // For equal score current generator is the default generator
-                    bestGenerator = currentGenerator;
+                    bestGeneratorIndex = currentGeneratorIndex;
                 }
                 incomingPredictionNumbers = prediction;
             }
         }
-        return bestGenerator;
+        return bestGeneratorIndex;
     }
 
     /**
      * Returns the best prediction for the latest incoming numbers.
      * @return prediction for latest incoming numbers
      */
-    public long[] getIncomingPredictionNumbers() {
+    NumberSequence getIncomingPredictionNumbers() {
         return incomingPredictionNumbers;
+    }
+
+    /**
+     * Deactivates all generators.
+     */
+    void deactivateAll() {
+        for (int i = 0; i < generators.length(); i++) {
+            generators.get(i).setActive(false);
+        }
     }
 
     /**
@@ -436,9 +437,10 @@ public class RandomManager {
                 try {
                     generators.set(this.generators.length() + i, new MersenneTwister(
                             MT_NAMES[i], MT_WORD_SIZES[i], MT_STATE_SIZES[i], MT_SHIFT_SIZES[i],
-                            MT_MASK_BITS[i], MT_TWIST_MASKS[i], MT_TEMPERING_US[i], MT_TEMPERING_DS[i],
-                            MT_TEMPERING_SS[i], MT_TEMPERING_BS[i], MT_TEMPERING_TS[i], MT_TEMPERING_CS[i],
-                            MT_TEMPERING_LS[i], MT_INITIALIZATION_MULTIPLIERS[i], MT_DEFAULT_SEEDS[i]));
+                            MT_MASK_BITS[i], MT_TWIST_MASKS[i], MT_TEMPERING_US[i],
+                            MT_TEMPERING_DS[i], MT_TEMPERING_SS[i], MT_TEMPERING_BS[i],
+                            MT_TEMPERING_TS[i], MT_TEMPERING_CS[i], MT_TEMPERING_LS[i],
+                            MT_INITIALIZATION_MULTIPLIERS[i], MT_DEFAULT_SEEDS[i]));
                 } catch (OutOfMemoryError e) {
                     // Not enough memory for Mersenne Twisters
                     return;

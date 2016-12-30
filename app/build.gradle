@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,14 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.1"
+    compileSdkVersion 25
+    buildToolsVersion "25.0.2"
 
     defaultConfig {
         applicationId "org.asnelt.derandom"
-        minSdkVersion 7
-        targetSdkVersion 23
+        minSdkVersion 9
+        targetSdkVersion 25
+        return void
     }
 
     buildTypes {
@@ -31,9 +32,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
     }
+
+    return void
 }
 
 dependencies {
-    compile 'com.android.support:appcompat-v7:23.0.1'
-    compile 'com.android.support:support-v4:23.0.1'
+    compile 'com.android.support:appcompat-v7:25.1.0'
+    compile 'com.android.support:support-v4:25.1.0'
 }

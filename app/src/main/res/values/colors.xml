@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015, 2016 Arno Onken
+Copyright (C) 2016 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,13 +15,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <resources>
-
-    <!--
-        Base application theme for API 11+. This theme completely replaces
-        AppBaseTheme from res/values/styles.xml on API 11+ devices.
-    -->
-    <style name="AppBaseTheme" parent="Theme.AppCompat">
-        <!-- API 11 theme customizations can go here. -->
-    </style>
-
+    <color name="accent">#ffff84</color>
+    <color name="primary">#311d00</color>
+    <color name="primary_dark">#000000</color>
+    <color name="foreground">#afa680</color>
+    <color name="background">#100d07</color>
+    <color name="text_color_primary">#fffded</color>
+    <color name="text_color">#fff9d4</color>
+    <color name="text_color_hint">#968c6a</color>
+    <color name="text_color_secondary">#cec499</color>
+    <color name="window_background">#181209</color>
+    <color name="separator">#fffded</color>
 </resources>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015, 2016 Arno Onken
+Copyright (C) 2016 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ limitations under the License.
     <PreferenceCategory
         android:title="@string/pref_prediction_title"
         android:key="pref_key_prediction_settings">
-        <CheckBoxPreference
+        <SwitchPreference
             android:key="pref_auto_detect"
             android:title="@string/pref_auto_detect"
             android:summary="@string/pref_auto_detect_summary"
@@ -33,7 +33,7 @@ limitations under the License.
     <PreferenceCategory
         android:title="@string/pref_io_title"
         android:key="pref_key_io_settings">
-        <CheckBoxPreference
+        <SwitchPreference
             android:key="pref_colored_past"
             android:title="@string/pref_colored_past"
             android:summary="@string/pref_colored_past_summary"

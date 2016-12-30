@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,11 @@ import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
-import android.widget.TextView;
 
 /**
  * A view for displaying a HistoryBuffer.
  */
-public class HistoryView extends TextView {
+public class HistoryView extends NumberSequenceView {
     /**
      * Interface for listening to scroll change events.
      */
@@ -178,40 +177,35 @@ public class HistoryView extends TextView {
     }
 
     /**
-     * Clears the view.
-     */
-    public void clear() {
-        setText("");
-    }
-
-    /**
      * Appends numbers to the text that is displayed.
-     * @param numbers numbers to display
+     * @param numberSequence number sequence to display
      */
-    public void appendNumbers(long[] numbers) {
-        appendNumbers(numbers, null);
+    @Override
+    public void append(NumberSequence numberSequence) {
+        append(numberSequence, null);
     }
 
     /**
-     * Appends numbers to the text that is displayed. If correctNumbers is not null and color is
-     * enabled then the numbers are colored. The numbers are colored green if they match the
-     * corresponding correctNumbers or red otherwise.
-     * @param numbers numbers to display
-     * @param correctNumbers numbers to compare to
+     * Appends numbers to the text that is displayed. If correctNumberSequence is not null and color
+     * is enabled then the numbers are colored. The numbers are colored green if they match the
+     * corresponding correctNumberSequence or red otherwise.
+     * @param numberSequence number sequence to display
+     * @param correctNumberSequence numbers to compare to
      */
-    public void appendNumbers(long[] numbers, long[] correctNumbers) {
-        if (numbers == null || numbers.length == 0) {
+    public void append(NumberSequence numberSequence, NumberSequence correctNumberSequence) {
+        if (numberSequence == null || numberSequence.isEmpty()) {
             return;
         }
+        int length = numberSequence.length();
         // Number of lines to remove from beginning of textView
-        int linesToRemove = getLineCount() + numbers.length - capacity;
+        int linesToRemove = getLineCount() + length - capacity;
         removeExcessNumbers(linesToRemove);
         // Offset to first number to append
-        int offset = numbers.length - capacity;
+        int offset = length - capacity;
         if (offset < 0) {
             offset = 0;
         }
-        showNumbers(numbers, correctNumbers, offset);
+        showNumbers(numberSequence, correctNumberSequence, offset);
         Layout layout = getLayout();
         if (layout != null) {
             scrollTo(0, layout.getHeight());
@@ -244,28 +238,31 @@ public class HistoryView extends TextView {
     /**
      * Shows numbers in the view. If correctNumbers is not null and color is enabled then the
      * numbers are colored.
-     * @param numbers the numbers to show
-     * @param correctNumbers the numbers to compare to
+     * @param numberSequence the number sequence to show
+     * @param correctNumberSequence the numbers to compare to
      * @param offset index of the first number to show
      */
-    private void showNumbers(long[] numbers, long[] correctNumbers, int offset) {
-        if (numbers == null || numbers.length == 0) {
+    private void showNumbers(NumberSequence numberSequence, NumberSequence correctNumberSequence,
+                             int offset) {
+        if (numberSequence == null || numberSequence.isEmpty()) {
             return;
         }
+        int length = numberSequence.length();
         // Check whether the numbers should be colored
-        boolean useColor = colored && correctNumbers != null
-                && correctNumbers.length >= numbers.length;
+        boolean useColor = colored && correctNumberSequence != null
+                && correctNumberSequence.length() >= length;
         // Check whether we need a newline at the beginning
         boolean initialNewline = getText().length() > 0;
         // Append colored numbers
-        for (int i = offset; i < numbers.length; i++) {
+        for (int i = offset; i < length; i++) {
             if (i > offset || initialNewline) {
                 append("\n");
             }
-            String numberString = Long.toString(numbers[i]);
+            String numberString = numberSequence.toString(i);
             if (useColor) {
                 Spannable coloredNumberString = new SpannableString(numberString);
-                if (numbers[i] == correctNumbers[i]) {
+                if (numberSequence.getInternalNumber(i)
+                        == correctNumberSequence.getInternalNumber(i)) {
                     ForegroundColorSpan colorGreen = new ForegroundColorSpan(Color.GREEN);
                     coloredNumberString.setSpan(colorGreen, 0, coloredNumberString.length(),
                             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);

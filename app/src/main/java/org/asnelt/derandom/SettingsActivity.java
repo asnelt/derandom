@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -174,7 +174,8 @@ public class SettingsActivity extends PreferenceActivity
                     }
                     numberPreference.setText(defaultValue);
                     String errorMessage = getResources().getString(R.string.number_error_message);
-                    Toast.makeText(SettingsActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getApplicationContext(), errorMessage,
+                            Toast.LENGTH_SHORT).show();
                 }
                 String summary = numberPreference.getText();
                 if (key.equals(SettingsActivity.KEY_PREF_SOCKET_PORT)) {

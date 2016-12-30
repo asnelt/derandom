@@ -12,8 +12,10 @@ generator like, for instance, the Java standard pseudo random number
 generator or the Mersenne Twister MT19937.  The app will then try to
 predict following numbers from the generator.
 
-The app expects all numbers to be entered as signed integers.  Three
-input modes are supported:
+The app expects all numbers to be entered as integers or floating point
+numbers between zero and one.  Currently, floating point numbers are
+supported for the Mersenne Twister only.  Three input modes are
+supported:
 
 1. *Text field* lets you enter the numbers directly on the device.
 2. *File* lets you choose a file with newline separated number strings.
@@ -64,13 +66,13 @@ s.close()
 ```
 Start the app on the Android device and set the input spinner from
 *Text field* to *Socket*.  Make sure that the device and the Derandom
-socket port (default 6869) is reachable in your network.  Then set `HOST`
-in the Python program to the address of your Android device and run the
-program.  For each number that is sent by the Python program, eight
-predictions are returned by Derandom and displayed by the Python program.
-After the app has received 624 numbers the Python Mersenne Twister should
-be detected and, in the app, numbers in the prediction history should
-appear in green instead of red.
+socket port (default 6869) are reachable in your network.  Then set
+`HOST` in the Python program to the address of your Android device and
+run the program.  For each number that is sent by the Python program,
+eight predictions are returned by Derandom and displayed by the Python
+program.  After the app has received 624 numbers the Python Mersenne
+Twister should be detected and, in the app, numbers in the prediction
+history should appear in green instead of red.
 
 
 Building from source
@@ -88,7 +90,7 @@ License
 -------
 
 ```text
-Copyright (C) 2015 Arno Onken
+Copyright (C) 2015, 2016 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

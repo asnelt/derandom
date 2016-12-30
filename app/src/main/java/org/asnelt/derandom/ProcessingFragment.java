@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,8 @@ public class ProcessingFragment extends Fragment {
          * @param historyNumbers previously entered numbers
          * @param historyPredictionNumbers predictions for previous numbers
          */
-        void onHistoryPredictionReplaced(long[] historyNumbers, long[] historyPredictionNumbers);
+        void onHistoryPredictionReplaced(NumberSequence historyNumbers,
+                                         NumberSequence historyPredictionNumbers);
 
         /**
          * Called when the random number generator selection changed.
@@ -67,13 +68,13 @@ public class ProcessingFragment extends Fragment {
          * @param inputNumbers the entered numbers
          * @param predictionNumbers predictions for entered numbers
          */
-        void onHistoryChanged(long[] inputNumbers, long[] predictionNumbers);
+        void onHistoryChanged(NumberSequence inputNumbers, NumberSequence predictionNumbers);
 
         /**
          * Called when the predictions for upcoming numbers changed.
          * @param predictionNumbers predictions of upcoming numbers
          */
-        void onPredictionChanged(long[] predictionNumbers);
+        void onPredictionChanged(NumberSequence predictionNumbers);
 
         /**
          * Called when setting the input method to an input file is aborted and sets the input
@@ -140,13 +141,15 @@ public class ProcessingFragment extends Fragment {
     /** Number of process input tasks. */
     private volatile int inputTaskLength;
     /** Flag for whether processing should continue. */
-    private volatile boolean processingDesirable;
+    private volatile boolean processingEnabled;
     /** Server socket port. */
     private volatile int serverPort;
     /** Server socket. */
-    private ServerSocket serverSocket;
+    private volatile ServerSocket serverSocket;
     /** Client socket. */
     private volatile Socket clientSocket;
+    /** Current number type. */
+    private volatile NumberSequence.NumberType numberType;
     /** Listener for processing changes. */
     private ProcessingFragmentListener listener;
     /** Future for cancelling the server task. */
@@ -167,8 +170,9 @@ public class ProcessingFragment extends Fragment {
         outputWriter = null;
         missingUpdate = false;
         inputSelection = 0;
+        numberType = NumberSequence.NumberType.RAW;
         inputTaskLength = 0;
-        processingDesirable = true;
+        processingEnabled = true;
         serverPort = 0;
         clientSocket = null;
         synchronizationObject = this;
@@ -218,12 +222,12 @@ public class ProcessingFragment extends Fragment {
 
     /**
      * Sets the currently active generator.
-     * @param number index of the currently active generator
+     * @param index index of the currently active generator
      */
-    public void setCurrentGenerator(int number) {
-        if (number != randomManager.getCurrentGenerator()) {
+    public void setCurrentGenerator(int index) {
+        if (index != randomManager.getCurrentGeneratorIndex()) {
             prepareInputProcessing();
-            processingExecutor.execute(new UpdateAllTask(number));
+            processingExecutor.execute(new UpdateAllTask(index));
         }
     }
 
@@ -343,7 +347,9 @@ public class ProcessingFragment extends Fragment {
      * Executes a clear task.
      */
     public void clear() {
-        processingDesirable = false;
+        randomManager.deactivateAll();
+        processingEnabled = false;
+        numberType = NumberSequence.NumberType.RAW;
         processingExecutor.execute(new ClearTask());
     }
 
@@ -462,7 +468,7 @@ public class ProcessingFragment extends Fragment {
      */
     @Override
     public void onDestroy() {
-        processingDesirable = false;
+        processingEnabled = false;
         // Shutdown server thread
         serverExecutor.shutdownNow();
         // Shutdown processing thread
@@ -513,9 +519,9 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             historyBuffer.clear();
-            int currentGenerator = randomManager.getCurrentGenerator();
+            int currentGeneratorIndex = randomManager.getCurrentGeneratorIndex();
             randomManager.reset();
-            randomManager.setCurrentGenerator(currentGenerator);
+            randomManager.setCurrentGeneratorIndex(currentGeneratorIndex);
             boolean posted = handler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -530,7 +536,7 @@ public class ProcessingFragment extends Fragment {
             if (!posted) {
                 missingUpdate = true;
             }
-            processingDesirable = true;
+            processingEnabled = true;
         }
     }
 
@@ -544,7 +550,7 @@ public class ProcessingFragment extends Fragment {
         /**
          * Constructor for setting the new input capacity.
          */
-        public ChangeCapacityTask(final int capacity) {
+        ChangeCapacityTask(final int capacity) {
             this.capacity = capacity;
         }
 
@@ -567,18 +573,18 @@ public class ProcessingFragment extends Fragment {
         private final boolean changeGenerator;
 
         /**
-         * Standard constructor that initializes a task that does not change the generator..
+         * Standard constructor that initializes a task that does not change the generator.
          */
-        public UpdateAllTask() {
+        UpdateAllTask() {
             this.generatorIndex = 0;
             this.changeGenerator = false;
         }
 
         /**
-         * Constructor that initializes a task that does change the generator.
+         * Constructor that initializes a task that changes the generator.
          * @param generatorIndex index of the new generator
          */
-        public UpdateAllTask(final int generatorIndex) {
+        UpdateAllTask(final int generatorIndex) {
             this.generatorIndex = generatorIndex;
             this.changeGenerator = true;
         }
@@ -589,23 +595,23 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             final boolean generatorChanged;
-            if (changeGenerator && randomManager.getCurrentGenerator() != generatorIndex) {
+            if (changeGenerator && randomManager.getCurrentGeneratorIndex() != generatorIndex) {
                 // Process complete history
-                randomManager.setCurrentGenerator(generatorIndex);
+                randomManager.setCurrentGeneratorIndex(generatorIndex);
                 generatorChanged = true;
             } else {
                 generatorChanged = false;
             }
-            final long[] historyNumbers;
-            final long[] historyPredictionNumbers;
-            final long[] predictionNumbers;
+            final NumberSequence historyNumbers;
+            final NumberSequence historyPredictionNumbers;
+            final NumberSequence predictionNumbers;
             if ((generatorChanged || !changeGenerator) && historyBuffer.length() > 0) {
                 randomManager.resetCurrentGenerator();
-                randomManager.findCurrentSeries(historyBuffer.toArray(), null);
-                historyNumbers = historyBuffer.toArray();
+                historyNumbers = new NumberSequence(historyBuffer.toArray(), numberType);
+                randomManager.findCurrentSequence(historyNumbers, null);
                 historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
                 // Generate new prediction without updating the state
-                predictionNumbers = randomManager.predict(predictionLength);
+                predictionNumbers = randomManager.predict(predictionLength, numberType);
             } else {
                 historyNumbers = null;
                 historyPredictionNumbers = null;
@@ -647,7 +653,7 @@ public class ProcessingFragment extends Fragment {
          * Constructor for processing an input string.
          * @param input the input string to be processed
          */
-        public ProcessInputTask(final String input) {
+        ProcessInputTask(final String input) {
             this.input = input;
             this.fileUri = null;
         }
@@ -656,7 +662,7 @@ public class ProcessingFragment extends Fragment {
          * Constructor for processing the input file pointed to by fileUri.
          * @param fileUri the URI of the file to be processed
          */
-        public ProcessInputTask(final Uri fileUri) {
+        ProcessInputTask(final Uri fileUri) {
             this.input = null;
             this.fileUri = fileUri;
         }
@@ -664,7 +670,7 @@ public class ProcessingFragment extends Fragment {
         /**
          * Constructor for processing input from current input reader.
          */
-        public ProcessInputTask() {
+        ProcessInputTask() {
             this.input = null;
             this.fileUri = null;
         }
@@ -720,7 +726,7 @@ public class ProcessingFragment extends Fragment {
                 return;
             }
             try {
-                while (inputReader.ready() && processingDesirable) {
+                while (inputReader.ready() && processingEnabled) {
                     String nextInput = inputReader.readLine();
                     if (nextInput == null) {
                         break;
@@ -799,53 +805,106 @@ public class ProcessingFragment extends Fragment {
         }
 
         /**
-         * Processes the given input string by parsing the numbers and searching for compatible
-         * generator states. The generator is eventually changed if the flag autoDetect is set and a
-         * better generator is detected..
-         * @param input string of newline separated integers
-         * @throws NumberFormatException if input contains an invalid number string
+         * Processes the given input string by parsing the input string and processing the numbers.
+         * @param inputString string of newline separated integers
          */
-        private void processInputString(String input) throws NumberFormatException {
-            long[] inputNumbers;
-            String[] stringNumbers = input.split("\n");
-            inputNumbers = new long[stringNumbers.length];
-            // Parse numbers
-            for (int i = 0; i < inputNumbers.length; i++) {
-                inputNumbers[i] = Long.parseLong(stringNumbers[i]);
+        private void processInputString(String inputString) {
+            NumberSequence inputNumbers;
+            String[] stringNumbers = inputString.split("\n");
+            inputNumbers = new NumberSequence(stringNumbers, numberType);
+            NumberSequence.NumberType inputNumberType = inputNumbers.getNumberType();
+            if (inputNumberType != numberType) {
+                // Reformat history numbers
+                NumberSequence historyNumbers = new NumberSequence(historyBuffer.toArray(),
+                        numberType);
+                historyNumbers.formatNumbers(inputNumberType);
+                historyBuffer.clear();
+                numberType = inputNumberType;
+                inputNumbers = historyNumbers.concatenate(inputNumbers);
+                showClear();
             }
-            long[] historyPredictionNumbers;
-            long[] historyNumbers = null;
-            long[] replacedNumbers = null;
-            int bestGenerator = 0;
-            boolean generatorChanged = false;
+            processInputNumbers(inputNumbers);
+        }
+
+        /**
+         * Processes the given input numbers searching for compatible generator states. The
+         * generator is eventually changed if the flag autoDetect is set and a better generator is
+         * detected.
+         * @param inputNumbers the number sequence to be processed
+         */
+        private void processInputNumbers(NumberSequence inputNumbers) {
+            NumberSequence historyPredictionNumbers;
             if (autoDetect) {
                 // Detect best generator and update all states
-                bestGenerator = randomManager.detectGenerator(inputNumbers, historyBuffer);
+                int bestGenerator = randomManager.detectGenerator(inputNumbers, historyBuffer);
                 historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
-                if (bestGenerator != randomManager.getCurrentGenerator()) {
+                if (bestGenerator != randomManager.getCurrentGeneratorIndex()) {
                     // Set generator and process complete history
-                    randomManager.setCurrentGenerator(bestGenerator);
+                    randomManager.setCurrentGeneratorIndex(bestGenerator);
                     randomManager.resetCurrentGenerator();
-                    historyNumbers = historyBuffer.toArray();
-                    randomManager.findCurrentSeries(historyNumbers, null);
-                    replacedNumbers = randomManager.getIncomingPredictionNumbers();
-                    randomManager.findCurrentSeries(inputNumbers, historyBuffer);
+                    NumberSequence historyNumbers = new NumberSequence(historyBuffer.toArray(),
+                            numberType);
+                    randomManager.findCurrentSequence(historyNumbers, null);
+                    NumberSequence replacedNumbers = randomManager.getIncomingPredictionNumbers();
+                    randomManager.findCurrentSequence(inputNumbers, historyBuffer);
                     historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
-                    generatorChanged = true;
+                    // Post change to user interface
+                    showGeneratorChange(historyNumbers, replacedNumbers, bestGenerator);
                 }
             } else {
-                randomManager.findCurrentSeries(inputNumbers, historyBuffer);
+                randomManager.findCurrentSequence(inputNumbers, historyBuffer);
                 historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
             }
             // Generate new prediction without updating the state
-            long[] predictionNumbers = randomManager.predict(predictionLength);
-            historyBuffer.put(inputNumbers);
+            NumberSequence predictionNumbers = randomManager.predict(predictionLength, numberType);
+            historyBuffer.put(inputNumbers.getInternalNumbers());
             // Post result to user interface
-            if (generatorChanged) {
-                showGeneratorChange(inputNumbers, historyPredictionNumbers, predictionNumbers,
-                        historyNumbers, replacedNumbers, bestGenerator);
-            } else {
-                showInputUpdate(inputNumbers, historyPredictionNumbers, predictionNumbers);
+            showInputUpdate(inputNumbers, historyPredictionNumbers, predictionNumbers);
+        }
+
+        /**
+         * Sends the instruction to clear to the processing listener.
+         */
+        private void showClear() {
+            boolean posted = handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    // Clear all fields
+                    if (listener != null) {
+                        listener.onClear();
+                    } else {
+                        missingUpdate = true;
+                    }
+                }
+            });
+            if (!posted) {
+                missingUpdate = true;
+            }
+        }
+
+        /**
+         * Sends the generator change to the processing listener.
+         * @param historyNumbers the complete previous input
+         * @param replacedNumbers the complete previous prediction numbers
+         * @param bestGenerator index of the best generator
+         */
+        private void showGeneratorChange(final NumberSequence historyNumbers,
+                                         final NumberSequence replacedNumbers,
+                                         final int bestGenerator) {
+            boolean posted = handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    // Append input numbers to history
+                    if (listener != null) {
+                        listener.onGeneratorChanged(bestGenerator);
+                        listener.onHistoryPredictionReplaced(historyNumbers, replacedNumbers);
+                    } else {
+                        missingUpdate = true;
+                    }
+                }
+            });
+            if (!posted) {
+                missingUpdate = true;
             }
         }
 
@@ -855,50 +914,14 @@ public class ProcessingFragment extends Fragment {
          * @param historyPredictionNumbers the prediction numbers corresponding to the input
          * @param predictionNumbers the predicted numbers
          */
-        private void showInputUpdate(final long[] inputNumbers,
-                                     final long[] historyPredictionNumbers,
-                                     final long[] predictionNumbers) {
+        private void showInputUpdate(final NumberSequence inputNumbers,
+                                     final NumberSequence historyPredictionNumbers,
+                                     final NumberSequence predictionNumbers) {
             boolean posted = handler.post(new Runnable() {
                 @Override
                 public void run() {
                     // Append input numbers to history
                     if (listener != null) {
-                        listener.onHistoryChanged(inputNumbers, historyPredictionNumbers);
-                        listener.onPredictionChanged(predictionNumbers);
-                    } else {
-                        missingUpdate = true;
-                    }
-                }
-            });
-            if (!posted) {
-                missingUpdate = true;
-            }
-            writeSocketOutput(predictionNumbers);
-        }
-
-        /**
-         * Sends the processing result to the processing listener. The result includes a change of
-         * generator.
-         * @param inputNumbers the processed input numbers
-         * @param historyPredictionNumbers the prediction numbers corresponding to the input
-         * @param predictionNumbers the predicted numbers
-         * @param historyNumbers the complete previous input
-         * @param replacedNumbers the complete previous prediction numbers
-         * @param bestGenerator index of the best generator
-         */
-        private void showGeneratorChange(final long[] inputNumbers,
-                                         final long[] historyPredictionNumbers,
-                                         final long[] predictionNumbers,
-                                         final long[] historyNumbers,
-                                         final long[] replacedNumbers,
-                                         final int bestGenerator) {
-            boolean posted = handler.post(new Runnable() {
-                @Override
-                public void run() {
-                    // Append input numbers to history
-                    if (listener != null) {
-                        listener.onGeneratorChanged(bestGenerator);
-                        listener.onHistoryPredictionReplaced(historyNumbers, replacedNumbers);
                         listener.onHistoryChanged(inputNumbers, historyPredictionNumbers);
                         listener.onPredictionChanged(predictionNumbers);
                     } else {
@@ -917,12 +940,12 @@ public class ProcessingFragment extends Fragment {
          * the prediction block.
          * @param predictionNumbers the predicted numbers
          */
-        private void writeSocketOutput(long[] predictionNumbers) {
+        private void writeSocketOutput(NumberSequence predictionNumbers) {
             if (outputWriter != null && predictionNumbers != null) {
                 try {
                     // Write numbers to output stream
-                    for (long number : predictionNumbers) {
-                        outputWriter.write(Long.toString(number));
+                    for (int i = 0; i < predictionNumbers.length(); i++) {
+                        outputWriter.write(predictionNumbers.toString(i));
                         outputWriter.newLine();
                     }
                     // Finish this sequence of numbers with an additional newline
@@ -945,9 +968,9 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             // Generate new prediction without updating the state
-            final long[] predictionNumbers;
+            final NumberSequence predictionNumbers;
             if (historyBuffer.length() > 0) {
-                predictionNumbers = randomManager.predict(predictionLength);
+                predictionNumbers = randomManager.predict(predictionLength, numberType);
             } else {
                 predictionNumbers = null;
             }

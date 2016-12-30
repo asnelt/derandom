@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Arno Onken
+ * Copyright (C) 2015, 2016 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,7 @@ import java.util.List;
 /**
  * This class implements a linear congruential random number generator.
  */
-public class LinearCongruentialGenerator extends RandomNumberGenerator {
-    /** Human readable name of the generator. */
-    private final String name;
+class LinearCongruentialGenerator extends RandomNumberGenerator {
     /** Multiplier parameter. */
     private final long multiplier;
     /** Human readable name of multiplier parameter. */
@@ -54,8 +52,6 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
     };
     /** The parameter names as a list. */
     private static final List PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
-    /** Two complement bit extension for negative integers. */
-    private static final long COMPLEMENT_INTEGER_EXTENSION = 0xFFFFFFFF00000000L;
     /** Internal state. */
     private volatile long state;
     /** Index of most significant modulus bit. */
@@ -75,9 +71,9 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @param bitRangeStart start index of output bits
      * @param bitRangeStop stop index of output bits
      */
-    public LinearCongruentialGenerator(String name, long multiplier, long increment, long modulus,
-                                       long seed, int bitRangeStart, int bitRangeStop) {
-        this.name = name;
+    LinearCongruentialGenerator(String name, long multiplier, long increment, long modulus,
+                                long seed, int bitRangeStart, int bitRangeStop) {
+        super(name);
         this.multiplier = multiplier;
         this.increment = increment;
         if (modulus == 0L) {
@@ -86,7 +82,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
         this.modulus = modulus;
         modulusBitRangeStop = Long.SIZE - Long.numberOfLeadingZeros(modulus) - 1;
         this.initialSeed = seed;
-        this.state = seed;
+        setState(seed);
         // Check index range
         if (bitRangeStart < 0) {
             throw new IllegalArgumentException("bitRangeStart must not be negative");
@@ -113,7 +109,8 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * Resets the generator to its initial seed.
      */
     @Override
-    public void reset() {
+    public synchronized void reset() {
+        super.reset();
         setState(initialSeed);
     }
 
@@ -121,17 +118,8 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * Sets the state of the generator.
      * @param state the complete state of the generator
      */
-    public synchronized void setState(long state) {
+    private synchronized void setState(long state) {
         this.state = state;
-    }
-
-    /**
-     * Returns the name of the generator.
-     * @return name of the generator
-     */
-    @Override
-    public String getName() {
-        return name;
     }
 
     /**
@@ -181,34 +169,57 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
     }
 
     /**
-     * Find prediction numbers that match the input series and update the state accordingly.
+     * Find prediction numbers that match the input sequence and update the state accordingly.
      * @param incomingNumbers new input numbers
      * @param historyBuffer previous input numbers
-     * @return predicted numbers that best match input series
+     * @return predicted numbers that best match input sequence
      */
     @Override
-    public synchronized long[] findSeries(long[] incomingNumbers, HistoryBuffer historyBuffer) {
-        long[] predicted = new long[incomingNumbers.length];
-        if (incomingNumbers.length == 0) {
-            // Empty input
-            return predicted;
-        }
-        // Make prediction based on current state
-        predicted[0] = next();
-        if (predicted[0] != incomingNumbers[0]) {
-            if (historyBuffer == null || historyBuffer.length() == 0) {
-                // No history present; just guess incoming number as new state
-                setState(incomingNumbers[0]);
-            } else {
-                // We have a pair to work with
-                setState(findState(historyBuffer.getLast(), incomingNumbers[0]));
+    public synchronized NumberSequence findSequence(NumberSequence incomingNumbers,
+                                                    HistoryBuffer historyBuffer) {
+        NumberSequence predicted;
+        if (incomingNumbers == null) {
+            predicted = new NumberSequence();
+        } else if (incomingNumbers.isEmpty()) {
+            predicted = new NumberSequence(incomingNumbers.getNumberType());
+        } else if (incomingNumbers.hasTruncatedOutput()) {
+            // Make prediction based on current state
+            predicted = peekNextOutputs(incomingNumbers.length(), incomingNumbers.getNumberType());
+            // Check whether the current state is compatible with the incoming numbers
+            if (predicted.equals(incomingNumbers)) {
+                return nextOutputs(incomingNumbers.length(), incomingNumbers.getNumberType());
             }
-        }
-        for (int i = 1; i < incomingNumbers.length; i++) {
-            predicted[i] = next();
-            if (predicted[i] != incomingNumbers[i]) {
-                setState(findState(incomingNumbers[i-1], incomingNumbers[i]));
+            // No option found, so disable generator; lattice reduction will solve this problem at
+            // some point
+            setActive(false);
+        } else {
+            int wordSize = getWordSize();
+            long[] incomingWords = incomingNumbers.getSequenceWords(wordSize);
+            NumberSequence.NumberType numberType = incomingNumbers.getNumberType();
+            // Make prediction based on current state
+            predicted = nextOutputs(incomingNumbers.length(), numberType);
+            long[] predictedWords = predicted.getSequenceWords(wordSize);
+            if (predictedWords[0] != incomingWords[0]) {
+                if (historyBuffer == null || historyBuffer.length() == 0) {
+                    // No history present; just guess incoming number as new state
+                    setState(incomingWords[0]);
+                } else {
+                    // We have a pair to work with
+                    NumberSequence lastNumber = new NumberSequence(
+                            new long[]{historyBuffer.getLast()}, numberType);
+                    long[] historyWords = lastNumber.getSequenceWords(wordSize);
+                    long lastHistoryWord = historyWords[historyWords.length - 1];
+                    setState(findState(lastHistoryWord, incomingWords[0]));
+                }
             }
+            for (int i = 1; i < incomingWords.length && isActive(); i++) {
+                long nextWord = next();
+                predicted.setSequenceWord(i, nextWord, wordSize);
+                if (nextWord != incomingWords[i]) {
+                    setState(findState(incomingWords[i - 1], incomingWords[i]));
+                }
+            }
+            predicted.fixNumberFormat();
         }
         return predicted;
     }
@@ -224,12 +235,43 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
     }
 
     /**
-     * Calculate the state of the generator based on two consecutive values.
+     * Returns the word size of the generator.
+     * @return the word size
+     */
+    protected int getWordSize() {
+        return bitRangeStop - bitRangeStart + 1;
+    }
+
+    /**
+     * Returns the state of the generator.
+     * @return the current state
+     */
+    @Override
+    protected long[] getState() {
+        long[] state = new long[1];
+        state[0] = this.state;
+        return state;
+    }
+
+    /**
+     * Sets the state of the generator.
+     * @param state the new state
+     * @throws IllegalArgumentException if state is empty
+     */
+    protected synchronized void setState(long[] state) {
+        if (state == null || state.length < 1) {
+            throw new IllegalArgumentException();
+        }
+        this.state = state[0];
+    }
+
+    /**
+     * Calculates the state of the generator based on two consecutive values.
      * @param number one output of the generator
      * @param successor next output of the generator
      * @return the state of the generator after the successor value
      */
-    private long findState(long number, long successor) {
+    private synchronized long findState(long number, long successor) {
         // Undo output shift
         number <<= bitRangeStart;
         // Number of leading bits that are hidden
@@ -258,12 +300,7 @@ public class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @return the output of the generator
      */
     private long calculateOutput(long state) {
-        long output = (state & mask) >> bitRangeStart;
-        // For integers add two complement bit extension for negative numbers
-        if (bitRangeStop - bitRangeStart + 1 == Integer.SIZE && output >> Integer.SIZE-1 > 0) {
-            output |= COMPLEMENT_INTEGER_EXTENSION;
-        }
-        return output;
+        return (state & mask) >> bitRangeStart;
     }
 
     /**

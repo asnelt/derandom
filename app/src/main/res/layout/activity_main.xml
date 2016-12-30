@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015 Arno Onken
+Copyright (C) 2015, 2016 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,8 +30,8 @@ limitations under the License.
         android:id="@+id/view_horizontal_center"
         android:layout_width="1dp"
         android:layout_height="match_parent"
-        android:layout_centerInParent="true"
-        android:background="@android:color/darker_gray" />
+        android:background="@color/separator"
+        android:layout_centerHorizontal="true" />
 	
     <TextView
         android:id="@+id/label_input"
@@ -44,6 +44,7 @@ limitations under the License.
         android:layout_toStartOf="@+id/view_horizontal_center"
         android:layout_marginRight="16dp"
         android:layout_marginEnd="16dp"
+        android:textColor="@color/accent"
         android:textStyle="bold"
         android:textSize="14sp"
         android:text="@string/input" />
@@ -59,6 +60,7 @@ limitations under the License.
         android:layout_toEndOf="@+id/view_horizontal_center"
         android:layout_marginLeft="16dp"
         android:layout_marginStart="16dp"
+        android:textColor="@color/accent"
         android:textStyle="bold"
         android:textSize="14sp"
         android:text="@string/prediction" />
@@ -130,7 +132,6 @@ limitations under the License.
         android:id="@+id/text_input"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
         android:layout_alignRight="@+id/view_horizontal_center"
@@ -140,17 +141,17 @@ limitations under the License.
         android:layout_marginEnd="16dp"
         android:scrollbars="vertical"
         android:gravity="top"
-        android:hint="@string/edit_message"
+        android:hint="@string/edit_hint"
         android:inputType="textMultiLine"
-        android:textSize="14sp" />
+        android:textSize="14sp"
+        android:layout_alignParentBottom="true" />
 
-    <TextView
+    <org.asnelt.derandom.NumberSequenceView
         android:id="@+id/text_prediction"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
         android:layout_alignLeft="@+id/view_horizontal_center"
         android:layout_alignStart="@+id/view_horizontal_center"
-        android:layout_alignParentBottom="true"
         android:layout_alignParentRight="true"
         android:layout_alignParentEnd="true"
         android:layout_below="@+id/view_vertical_center"
@@ -159,20 +160,17 @@ limitations under the License.
         android:scrollbars="vertical"
         android:gravity="top"
         android:textSize="14sp"
-        android:freezesText="true" />
+        android:freezesText="true"
+        android:textIsSelectable="true"
+        android:layout_alignParentBottom="true" />
 
     <ProgressBar
         android:id="@+id/progress_bar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignRight="@+id/view_horizontal_center"
-        android:layout_alignEnd="@+id/view_horizontal_center"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:layout_below="@+id/view_vertical_center"
-        android:layout_marginRight="16dp"
-        android:layout_marginEnd="16dp"
+        android:layout_alignBottom="@+id/text_input"
+        android:layout_toLeftOf="@+id/view_horizontal_center"
+        android:layout_toStartOf="@+id/view_horizontal_center"
         android:visibility="gone"
         style="@android:style/Widget.ProgressBar" />
 
