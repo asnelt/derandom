@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@ import java.nio.BufferUnderflowException;
  */
 class HistoryBuffer {
     /** The maximum number of elements in the buffer. */
-    private int capacity;
+    private int mCapacity;
     /** The array for storing the elements. */
-    private long[] numbers;
+    private long[] mNumbers;
     /** Index of the first element. */
-    private int head;
+    private int mHead;
     /** Index of the last element. */
-    private int tail;
+    private int mTail;
 
     /**
      * Constructs an empty buffer with a given capacity.
@@ -44,9 +44,9 @@ class HistoryBuffer {
      * Removes all elements from the buffer.
      */
     void clear() {
-        head = 0;
-        tail = -1;
-        numbers = new long[0];
+        mHead = 0;
+        mTail = -1;
+        mNumbers = new long[0];
     }
 
     /**
@@ -58,18 +58,18 @@ class HistoryBuffer {
         if (capacity < 0) {
             throw new IllegalArgumentException("capacity must not be negative");
         }
-        if (this.capacity != capacity) {
-            if (capacity < numbers.length) {
-                // Shrink numbers
+        if (mCapacity != capacity) {
+            if (capacity < mNumbers.length) {
+                // Shrink mNumbers
                 if (length() >= capacity) {
-                    numbers = getLast(capacity);
-                    head = 0;
-                    tail = capacity - 1;
+                    mNumbers = getLast(capacity);
+                    mHead = 0;
+                    mTail = capacity - 1;
                 } else {
                     rebuildNumbers(capacity);
                 }
             }
-            this.capacity = capacity;
+            mCapacity = capacity;
         }
     }
 
@@ -82,32 +82,34 @@ class HistoryBuffer {
             return;
         }
         int currentLength = length();
-        if (currentLength + incomingNumbers.length > numbers.length && numbers.length < capacity) {
+        if (currentLength + incomingNumbers.length > mNumbers.length
+                && mNumbers.length < mCapacity) {
             grow(incomingNumbers.length);
         }
-        if (incomingNumbers.length <= numbers.length) {
+        if (incomingNumbers.length <= mNumbers.length) {
             // Incoming numbers fit into buffer
-            int endLength = numbers.length - tail - 1;
+            int endLength = mNumbers.length - mTail - 1;
             if (endLength > incomingNumbers.length) {
                 endLength = incomingNumbers.length;
             }
             int startLength = incomingNumbers.length - endLength;
             if (endLength > 0) {
-                System.arraycopy(incomingNumbers, 0, numbers, tail+1, endLength);
+                System.arraycopy(incomingNumbers, 0, mNumbers, mTail + 1, endLength);
             }
             if (startLength > 0) {
-                System.arraycopy(incomingNumbers, endLength, numbers, 0, startLength);
+                System.arraycopy(incomingNumbers, endLength, mNumbers, 0, startLength);
             }
-            if (tail > -1 && (head > tail && head <= tail + endLength || head < startLength)) {
-                head = (tail + incomingNumbers.length + 1) % numbers.length;
+            if (mTail > -1 && (mHead > mTail && mHead <= mTail + endLength
+                    || mHead < startLength)) {
+                mHead = (mTail + incomingNumbers.length + 1) % mNumbers.length;
             }
-            tail = (tail + incomingNumbers.length) % numbers.length;
+            mTail = (mTail + incomingNumbers.length) % mNumbers.length;
         } else {
             // Incoming numbers do not fit into buffer
-            System.arraycopy(incomingNumbers, incomingNumbers.length-numbers.length, numbers, 0,
-                    numbers.length);
-            head = 0;
-            tail = numbers.length-1;
+            System.arraycopy(incomingNumbers, incomingNumbers.length - mNumbers.length, mNumbers, 0,
+                    mNumbers.length);
+            mHead = 0;
+            mTail = mNumbers.length - 1;
         }
     }
 
@@ -117,11 +119,11 @@ class HistoryBuffer {
      * @throws BufferUnderflowException if the buffer is empty
      */
     long getLast() throws BufferUnderflowException {
-        if (tail < 0) {
+        if (mTail < 0) {
             // Empty buffer
             throw new BufferUnderflowException();
         }
-        return numbers[tail];
+        return mNumbers[mTail];
     }
 
     /**
@@ -136,12 +138,12 @@ class HistoryBuffer {
         }
         long[] rangeNumbers = new long[range];
         if (range > 0) {
-            if (tail+1 >= range) {
-                System.arraycopy(numbers, tail-range+1, rangeNumbers, 0, range);
+            if (mTail + 1 >= range) {
+                System.arraycopy(mNumbers, mTail - range + 1, rangeNumbers, 0, range);
             } else {
-                System.arraycopy(numbers, numbers.length-(range-tail-1), rangeNumbers, 0,
-                        range-tail-1);
-                System.arraycopy(numbers, 0, rangeNumbers, range-tail-1, tail+1);
+                System.arraycopy(mNumbers, mNumbers.length - (range - mTail - 1), rangeNumbers, 0,
+                        range - mTail - 1);
+                System.arraycopy(mNumbers, 0, rangeNumbers, range - mTail - 1, mTail + 1);
             }
         }
         return rangeNumbers;
@@ -160,15 +162,15 @@ class HistoryBuffer {
      * @return the number of elements in the buffer
      */
     public int length() {
-        if (tail < 0) {
+        if (mTail < 0) {
             // Empty buffer
             return 0;
         }
-        if (tail >= head) {
-            return tail-head+1;
+        if (mTail >= mHead) {
+            return mTail - mHead + 1;
         }
-        // tail < head
-        return numbers.length-(head-tail-1);
+        // mTail < mHead
+        return mNumbers.length - (mHead - mTail - 1);
     }
 
     /**
@@ -176,16 +178,16 @@ class HistoryBuffer {
      * @param size the number of additional elements that need to be stored
      */
     private void grow(int size) {
-        int growLength = numbers.length;
+        int growLength = mNumbers.length;
         if (growLength <= 0) {
             growLength = 1;
         }
         // Double growLength until we can fit size additional elements
-        while (growLength < numbers.length + size && growLength > 0) {
+        while (growLength < mNumbers.length + size && growLength > 0) {
             growLength *= 2;
         }
-        if (growLength > capacity || growLength < 0) {
-            growLength = capacity;
+        if (growLength > mCapacity || growLength < 0) {
+            growLength = mCapacity;
         }
         try {
             rebuildNumbers(growLength);
@@ -201,17 +203,17 @@ class HistoryBuffer {
      */
     private void rebuildNumbers(int newLength) {
         long[] newNumbers = new long[newLength];
-        if (tail >= 0) {
-            if (tail >= head) {
-                System.arraycopy(numbers, head, newNumbers, 0, tail-head+1);
-                tail = tail-head;
+        if (mTail >= 0) {
+            if (mTail >= mHead) {
+                System.arraycopy(mNumbers, mHead, newNumbers, 0, mTail - mHead + 1);
+                mTail = mTail - mHead;
             } else {
-                System.arraycopy(numbers, head, newNumbers, 0, numbers.length-head);
-                System.arraycopy(numbers, 0, newNumbers, numbers.length-head, tail+1);
-                tail = numbers.length-(head-tail);
+                System.arraycopy(mNumbers, mHead, newNumbers, 0, mNumbers.length - mHead);
+                System.arraycopy(mNumbers, 0, newNumbers, mNumbers.length - mHead, mTail + 1);
+                mTail = mNumbers.length - (mHead - mTail);
             }
-            head = 0;
+            mHead = 0;
         }
-        numbers = newNumbers;
+        mNumbers = newNumbers;
     }
 }

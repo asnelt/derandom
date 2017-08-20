@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,16 +21,16 @@ package org.asnelt.derandom;
  */
 abstract class RandomNumberGenerator {
     /** Human readable name of the generator. */
-    private final String name;
+    private final String mName;
     /** Flag that signifies whether the generator is compatible with the input so far. */
-    private volatile boolean active;
+    private volatile boolean mActive;
 
     /**
      * Constructor initializing all parameters.
      * @param name name of the generator
      */
     RandomNumberGenerator(String name) {
-        this.name = name;
+        mName = name;
         setActive(true);
     }
 
@@ -81,7 +81,7 @@ abstract class RandomNumberGenerator {
      * @return name of the generator
      */
     public String getName() {
-        return name;
+        return mName;
     }
 
     /**
@@ -89,7 +89,7 @@ abstract class RandomNumberGenerator {
      * @param active the new activity state.
      */
     void setActive(boolean active) {
-        this.active = active;
+        mActive = active;
     }
 
     /**
@@ -99,7 +99,7 @@ abstract class RandomNumberGenerator {
      * @return the activity state of the generator
      */
     boolean isActive() {
-        return active;
+        return mActive;
     }
 
     /**

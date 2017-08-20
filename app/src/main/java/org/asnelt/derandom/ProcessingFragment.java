@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ public class ProcessingFragment extends Fragment {
     /**
      * Interface for listening to processing changes.
      */
-    public interface ProcessingFragmentListener {
+    interface ProcessingFragmentListener {
         /**
          * Called when the history prediction was completely replaced.
          * @param historyNumbers previously entered numbers
@@ -111,51 +111,51 @@ public class ProcessingFragment extends Fragment {
     }
 
     /** Random manager for generating predictions. */
-    private final RandomManager randomManager;
+    private final RandomManager mRandomManager;
     /** Handler for updating the user interface. */
-    private final Handler handler;
+    private final Handler mHandler;
     /** Circular buffer for storing input numbers. */
-    private final HistoryBuffer historyBuffer;
+    private final HistoryBuffer mHistoryBuffer;
     /** Object for synchronizing the main thread and the processing thread. */
-    private final Object synchronizationObject;
+    private final Object mSynchronizationObject;
     /** Executor service for all processing tasks. */
-    private final ExecutorService processingExecutor;
+    private final ExecutorService mProcessingExecutor;
     /** Executor service for server task. */
-    private final ExecutorService serverExecutor;
+    private final ExecutorService mServerExecutor;
     /** Lock for the disconnected condition. */
-    private final Lock connectionLock;
+    private final Lock mConnectionLock;
     /** Condition that is triggered when the client socket is disconnected. */
-    private final Condition disconnected;
+    private final Condition mDisconnected;
     /** Number of numbers to forecast. */
-    private volatile int predictionLength;
+    private volatile int mPredictionLength;
     /** Flag for whether the generator should be detected automatically. */
-    private volatile boolean autoDetect;
+    private volatile boolean mAutoDetect;
     /** Current input file for reading numbers. */
-    private volatile Uri inputUri;
+    private volatile Uri mInputUri;
     /** Reader for reading input numbers. */
-    private volatile BufferedReader inputReader;
+    private volatile BufferedReader mInputReader;
     /** Writer for writing predictions to the client socket. */
-    private volatile BufferedWriter outputWriter;
+    private volatile BufferedWriter mOutputWriter;
     /** Flag for whether a user interface update was missed during a configuration change. */
-    private volatile boolean missingUpdate;
+    private volatile boolean mMissingUpdate;
     /** Number of process input tasks. */
-    private volatile int inputTaskLength;
+    private volatile int mInputTaskLength;
     /** Flag for whether processing should continue. */
-    private volatile boolean processingEnabled;
+    private volatile boolean mProcessingEnabled;
     /** Server socket port. */
-    private volatile int serverPort;
+    private volatile int mServerPort;
     /** Server socket. */
-    private volatile ServerSocket serverSocket;
+    private volatile ServerSocket mServerSocket;
     /** Client socket. */
-    private volatile Socket clientSocket;
+    private volatile Socket mClientSocket;
     /** Current number type. */
-    private volatile NumberSequence.NumberType numberType;
+    private volatile NumberSequence.NumberType mNumberType;
     /** Listener for processing changes. */
-    private ProcessingFragmentListener listener;
+    private ProcessingFragmentListener mListener;
     /** Future for cancelling the server task. */
-    private Future<?> serverFuture;
+    private Future<?> mServerFuture;
     /** Index of selected input method. */
-    private int inputSelection;
+    private int mInputSelection;
 
     /**
      * Constructor for initializing the processing fragment. Generates a HistoryBuffer, a
@@ -163,28 +163,28 @@ public class ProcessingFragment extends Fragment {
      */
     public ProcessingFragment() {
         super();
-        predictionLength = 0;
-        autoDetect = false;
-        inputUri = null;
-        inputReader = null;
-        outputWriter = null;
-        missingUpdate = false;
-        inputSelection = 0;
-        numberType = NumberSequence.NumberType.RAW;
-        inputTaskLength = 0;
-        processingEnabled = true;
-        serverPort = 0;
-        clientSocket = null;
-        synchronizationObject = this;
-        historyBuffer = new HistoryBuffer(0);
-        randomManager = new RandomManager();
+        mPredictionLength = 0;
+        mAutoDetect = false;
+        mInputUri = null;
+        mInputReader = null;
+        mOutputWriter = null;
+        mMissingUpdate = false;
+        mInputSelection = 0;
+        mNumberType = NumberSequence.NumberType.RAW;
+        mInputTaskLength = 0;
+        mProcessingEnabled = true;
+        mServerPort = 0;
+        mClientSocket = null;
+        mSynchronizationObject = this;
+        mHistoryBuffer = new HistoryBuffer(0);
+        mRandomManager = new RandomManager();
         // Handler for processing user interface updates
-        handler = new Handler(Looper.getMainLooper());
-        processingExecutor = Executors.newSingleThreadExecutor();
-        serverExecutor = Executors.newSingleThreadExecutor();
-        connectionLock = new ReentrantLock();
-        disconnected = connectionLock.newCondition();
-        serverFuture = null;
+        mHandler = new Handler(Looper.getMainLooper());
+        mProcessingExecutor = Executors.newSingleThreadExecutor();
+        mServerExecutor = Executors.newSingleThreadExecutor();
+        mConnectionLock = new ReentrantLock();
+        mDisconnected = mConnectionLock.newCondition();
+        mServerFuture = null;
     }
 
     /**
@@ -207,7 +207,7 @@ public class ProcessingFragment extends Fragment {
     public void onAttach(Context context) {
         super.onAttach(context);
         if (context instanceof MainActivity) {
-            listener = (ProcessingFragmentListener) context;
+            mListener = (ProcessingFragmentListener) context;
         }
     }
 
@@ -217,7 +217,7 @@ public class ProcessingFragment extends Fragment {
     @Override
     public void onDetach() {
         super.onDetach();
-        listener = null;
+        mListener = null;
     }
 
     /**
@@ -225,9 +225,9 @@ public class ProcessingFragment extends Fragment {
      * @param index index of the currently active generator
      */
     public void setCurrentGenerator(int index) {
-        if (index != randomManager.getCurrentGeneratorIndex()) {
+        if (index != mRandomManager.getCurrentGeneratorIndex()) {
             prepareInputProcessing();
-            processingExecutor.execute(new UpdateAllTask(index));
+            mProcessingExecutor.execute(new UpdateAllTask(index));
         }
     }
 
@@ -236,7 +236,7 @@ public class ProcessingFragment extends Fragment {
      * @return all generator names
      */
     public String[] getGeneratorNames() {
-        return randomManager.getGeneratorNames();
+        return mRandomManager.getGeneratorNames();
     }
 
     /**
@@ -244,7 +244,7 @@ public class ProcessingFragment extends Fragment {
      * @return name of the currently active generator
      */
     public String getCurrentGeneratorName() {
-        return randomManager.getCurrentGeneratorName();
+        return mRandomManager.getCurrentGeneratorName();
     }
 
     /**
@@ -252,7 +252,7 @@ public class ProcessingFragment extends Fragment {
      * @return all parameter names of the currently active generator
      */
     public String[] getCurrentParameterNames() {
-        return randomManager.getCurrentParameterNames();
+        return mRandomManager.getCurrentParameterNames();
     }
 
     /**
@@ -260,7 +260,7 @@ public class ProcessingFragment extends Fragment {
      * @return parameter values of the currently active generator
      */
     public long[] getCurrentParameters() {
-        return randomManager.getCurrentParameters();
+        return mRandomManager.getCurrentParameters();
     }
 
     /**
@@ -268,7 +268,7 @@ public class ProcessingFragment extends Fragment {
      * @param inputSelection the new input selection index
      */
     public void setInputSelection(int inputSelection) {
-        this.inputSelection = inputSelection;
+        mInputSelection = inputSelection;
     }
 
     /**
@@ -276,7 +276,7 @@ public class ProcessingFragment extends Fragment {
      * @return the current input selection index
      */
     public int getInputSelection() {
-        return inputSelection;
+        return mInputSelection;
     }
 
     /**
@@ -284,14 +284,14 @@ public class ProcessingFragment extends Fragment {
      * @return the current input URI
      */
     public Uri getInputUri() {
-        return inputUri;
+        return mInputUri;
     }
 
     /**
      * Sets the input URI to null.
      */
     public void resetInputUri() {
-        inputUri = null;
+        mInputUri = null;
     }
 
     /**
@@ -299,8 +299,8 @@ public class ProcessingFragment extends Fragment {
      * @param predictionLength the number of numbers to predict
      */
     public void setPredictionLength(int predictionLength) {
-        if (this.predictionLength != predictionLength) {
-            this.predictionLength = predictionLength;
+        if (mPredictionLength != predictionLength) {
+            mPredictionLength = predictionLength;
             updatePrediction();
         }
     }
@@ -310,7 +310,7 @@ public class ProcessingFragment extends Fragment {
      * @param autoDetect automatically detect generator if true
      */
     public void setAutoDetect(boolean autoDetect) {
-        this.autoDetect = autoDetect;
+        mAutoDetect = autoDetect;
     }
 
     /**
@@ -318,9 +318,9 @@ public class ProcessingFragment extends Fragment {
      * @param serverPort the new server port
      */
     public void setServerPort(int serverPort) {
-        if (this.serverPort != serverPort) {
-            this.serverPort = serverPort;
-            if (serverFuture != null) {
+        if (mServerPort != serverPort) {
+            mServerPort = serverPort;
+            if (mServerFuture != null) {
                 stopServerTask();
                 startServerTask();
             }
@@ -332,7 +332,7 @@ public class ProcessingFragment extends Fragment {
      * @return true if input is currently processed
      */
     public boolean isProcessingInput() {
-        return inputTaskLength > 0;
+        return mInputTaskLength > 0;
     }
 
     /**
@@ -340,17 +340,17 @@ public class ProcessingFragment extends Fragment {
      * @return true if an update was missed
      */
     public boolean isMissingUpdate() {
-        return missingUpdate;
+        return mMissingUpdate;
     }
 
     /**
      * Executes a clear task.
      */
     public void clear() {
-        randomManager.deactivateAll();
-        processingEnabled = false;
-        numberType = NumberSequence.NumberType.RAW;
-        processingExecutor.execute(new ClearTask());
+        mRandomManager.deactivateAll();
+        mProcessingEnabled = false;
+        mNumberType = NumberSequence.NumberType.RAW;
+        mProcessingExecutor.execute(new ClearTask());
     }
 
     /**
@@ -358,7 +358,7 @@ public class ProcessingFragment extends Fragment {
      * @param capacity the new input history capacity
      */
     public void setCapacity(int capacity) {
-        processingExecutor.execute(new ChangeCapacityTask(capacity));
+        mProcessingExecutor.execute(new ChangeCapacityTask(capacity));
     }
 
     /**
@@ -366,7 +366,7 @@ public class ProcessingFragment extends Fragment {
      */
     public void updateAll() {
         prepareInputProcessing();
-        processingExecutor.execute(new UpdateAllTask());
+        mProcessingExecutor.execute(new UpdateAllTask());
     }
 
     /**
@@ -376,7 +376,7 @@ public class ProcessingFragment extends Fragment {
     public void processInputString(String input) {
         // Process input in separate thread
         prepareInputProcessing();
-        processingExecutor.execute(new ProcessInputTask(input));
+        mProcessingExecutor.execute(new ProcessInputTask(input));
     }
 
     /**
@@ -385,7 +385,7 @@ public class ProcessingFragment extends Fragment {
     public void processInputSocket() {
         // Process input in separate thread
         prepareInputProcessing();
-        processingExecutor.execute(new ProcessInputTask());
+        mProcessingExecutor.execute(new ProcessInputTask());
     }
 
     /**
@@ -395,23 +395,23 @@ public class ProcessingFragment extends Fragment {
     public void processInputFile(Uri fileUri) {
         // Process input in separate thread
         prepareInputProcessing();
-        processingExecutor.execute(new ProcessInputTask(fileUri));
+        mProcessingExecutor.execute(new ProcessInputTask(fileUri));
     }
 
     /**
      * Starts the server task and sets the server future.
      */
     public void startServerTask() {
-        serverFuture = serverExecutor.submit(new ServerTask());
+        mServerFuture = mServerExecutor.submit(new ServerTask());
     }
 
     /**
      * Stops the server task and sets the server future to null. Closes all sockets.
      */
     public void stopServerTask() {
-        if (serverFuture != null) {
-            serverFuture.cancel(true);
-            serverFuture = null;
+        if (mServerFuture != null) {
+            mServerFuture.cancel(true);
+            mServerFuture = null;
         }
         closeSockets();
     }
@@ -420,28 +420,28 @@ public class ProcessingFragment extends Fragment {
      * Closes the client socket and the reader and writer.
      */
     private void closeClient() {
-        synchronized (synchronizationObject) {
-            if (inputReader != null) {
+        synchronized (mSynchronizationObject) {
+            if (mInputReader != null) {
                 try {
-                    inputReader.close();
+                    mInputReader.close();
                 } catch (IOException e) {
                     // We do not need to do anything more with the reader
                 }
             }
-            if (outputWriter != null) {
+            if (mOutputWriter != null) {
                 try {
-                    outputWriter.close();
+                    mOutputWriter.close();
                 } catch (IOException e) {
                     // We do not need to do anything more with the writer
                 }
             }
-            if (clientSocket != null) {
+            if (mClientSocket != null) {
                 try {
-                    clientSocket.close();
+                    mClientSocket.close();
                 } catch (IOException e) {
                     // We do not need to do anything more with the client socket
                 }
-                clientSocket = null;
+                mClientSocket = null;
             }
         }
     }
@@ -450,15 +450,15 @@ public class ProcessingFragment extends Fragment {
      * Closes all sockets.
      */
     private void closeSockets() {
-        synchronized (synchronizationObject) {
+        synchronized (mSynchronizationObject) {
             closeClient();
-            if (serverSocket != null) {
+            if (mServerSocket != null) {
                 try {
-                    serverSocket.close();
+                    mServerSocket.close();
                 } catch (IOException e) {
                     // We do not need to do anything more with the server socket
                 }
-                serverSocket = null;
+                mServerSocket = null;
             }
         }
     }
@@ -468,11 +468,11 @@ public class ProcessingFragment extends Fragment {
      */
     @Override
     public void onDestroy() {
-        processingEnabled = false;
+        mProcessingEnabled = false;
         // Shutdown server thread
-        serverExecutor.shutdownNow();
+        mServerExecutor.shutdownNow();
         // Shutdown processing thread
-        processingExecutor.shutdownNow();
+        mProcessingExecutor.shutdownNow();
         // Close all sockets
         closeSockets();
         super.onDestroy();
@@ -483,11 +483,11 @@ public class ProcessingFragment extends Fragment {
      * progressing status.
      */
     private void prepareInputProcessing() {
-        synchronized (synchronizationObject) {
-            inputTaskLength++;
+        synchronized (mSynchronizationObject) {
+            mInputTaskLength++;
         }
-        if (listener != null) {
-            listener.onProgressUpdate();
+        if (mListener != null) {
+            mListener.onProgressUpdate();
         }
     }
 
@@ -495,18 +495,18 @@ public class ProcessingFragment extends Fragment {
      * Finishes input processing by decrementing the counter of active input tasks.
      */
     private void finishInputProcessing() {
-        synchronized (synchronizationObject) {
-            if (inputTaskLength > 0) {
-                inputTaskLength--;
+        synchronized (mSynchronizationObject) {
+            if (mInputTaskLength > 0) {
+                mInputTaskLength--;
             }
         }
     }
 
     /**
-     * Calculates a new prediction and notifies the listener.
+     * Calculates a new prediction and notifies the mListener.
      */
     private void updatePrediction() {
-        processingExecutor.execute(new UpdatePredictionTask());
+        mProcessingExecutor.execute(new UpdatePredictionTask());
     }
 
     /**
@@ -518,25 +518,25 @@ public class ProcessingFragment extends Fragment {
          */
         @Override
         public void run() {
-            historyBuffer.clear();
-            int currentGeneratorIndex = randomManager.getCurrentGeneratorIndex();
-            randomManager.reset();
-            randomManager.setCurrentGeneratorIndex(currentGeneratorIndex);
-            boolean posted = handler.post(new Runnable() {
+            mHistoryBuffer.clear();
+            int currentGeneratorIndex = mRandomManager.getCurrentGeneratorIndex();
+            mRandomManager.reset();
+            mRandomManager.setCurrentGeneratorIndex(currentGeneratorIndex);
+            boolean posted = mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (listener != null) {
-                        listener.onClear();
-                        missingUpdate = false;
+                    if (mListener != null) {
+                        mListener.onClear();
+                        mMissingUpdate = false;
                     } else {
-                        missingUpdate = true;
+                        mMissingUpdate = true;
                     }
                 }
             });
             if (!posted) {
-                missingUpdate = true;
+                mMissingUpdate = true;
             }
-            processingEnabled = true;
+            mProcessingEnabled = true;
         }
     }
 
@@ -545,13 +545,13 @@ public class ProcessingFragment extends Fragment {
      */
     private class ChangeCapacityTask implements Runnable {
         /** The new input capacity. */
-        private final int capacity;
+        private final int mCapacity;
 
         /**
          * Constructor for setting the new input capacity.
          */
         ChangeCapacityTask(final int capacity) {
-            this.capacity = capacity;
+            mCapacity = capacity;
         }
 
         /**
@@ -559,7 +559,7 @@ public class ProcessingFragment extends Fragment {
          */
         @Override
         public void run() {
-            historyBuffer.setCapacity(capacity);
+            mHistoryBuffer.setCapacity(mCapacity);
         }
     }
 
@@ -568,16 +568,16 @@ public class ProcessingFragment extends Fragment {
      */
     private class UpdateAllTask implements Runnable {
         /** The index of the new generator. */
-        private final int generatorIndex;
+        private final int mGeneratorIndex;
         /** Flag that determines whether the generator should be changed. */
-        private final boolean changeGenerator;
+        private final boolean mChangeGenerator;
 
         /**
          * Standard constructor that initializes a task that does not change the generator.
          */
         UpdateAllTask() {
-            this.generatorIndex = 0;
-            this.changeGenerator = false;
+            mGeneratorIndex = 0;
+            mChangeGenerator = false;
         }
 
         /**
@@ -585,8 +585,8 @@ public class ProcessingFragment extends Fragment {
          * @param generatorIndex index of the new generator
          */
         UpdateAllTask(final int generatorIndex) {
-            this.generatorIndex = generatorIndex;
-            this.changeGenerator = true;
+            mGeneratorIndex = generatorIndex;
+            mChangeGenerator = true;
         }
 
         /**
@@ -595,9 +595,9 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             final boolean generatorChanged;
-            if (changeGenerator && randomManager.getCurrentGeneratorIndex() != generatorIndex) {
+            if (mChangeGenerator && mRandomManager.getCurrentGeneratorIndex() != mGeneratorIndex) {
                 // Process complete history
-                randomManager.setCurrentGeneratorIndex(generatorIndex);
+                mRandomManager.setCurrentGeneratorIndex(mGeneratorIndex);
                 generatorChanged = true;
             } else {
                 generatorChanged = false;
@@ -605,37 +605,37 @@ public class ProcessingFragment extends Fragment {
             final NumberSequence historyNumbers;
             final NumberSequence historyPredictionNumbers;
             final NumberSequence predictionNumbers;
-            if ((generatorChanged || !changeGenerator) && historyBuffer.length() > 0) {
-                randomManager.resetCurrentGenerator();
-                historyNumbers = new NumberSequence(historyBuffer.toArray(), numberType);
-                randomManager.findCurrentSequence(historyNumbers, null);
-                historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
+            if ((generatorChanged || !mChangeGenerator) && mHistoryBuffer.length() > 0) {
+                mRandomManager.resetCurrentGenerator();
+                historyNumbers = new NumberSequence(mHistoryBuffer.toArray(), mNumberType);
+                mRandomManager.findCurrentSequence(historyNumbers, null);
+                historyPredictionNumbers = mRandomManager.getIncomingPredictionNumbers();
                 // Generate new prediction without updating the state
-                predictionNumbers = randomManager.predict(predictionLength, numberType);
+                predictionNumbers = mRandomManager.predict(mPredictionLength, mNumberType);
             } else {
                 historyNumbers = null;
                 historyPredictionNumbers = null;
                 predictionNumbers = null;
             }
             finishInputProcessing();
-            boolean posted = handler.post(new Runnable() {
+            boolean posted = mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (generatorChanged || !changeGenerator) {
-                        if (listener != null) {
-                            listener.onProgressUpdate();
-                            listener.onHistoryPredictionReplaced(historyNumbers,
+                    if (generatorChanged || !mChangeGenerator) {
+                        if (mListener != null) {
+                            mListener.onProgressUpdate();
+                            mListener.onHistoryPredictionReplaced(historyNumbers,
                                     historyPredictionNumbers);
-                            listener.onPredictionChanged(predictionNumbers);
-                            missingUpdate = false;
+                            mListener.onPredictionChanged(predictionNumbers);
+                            mMissingUpdate = false;
                         } else {
-                            missingUpdate = true;
+                            mMissingUpdate = true;
                         }
                     }
                 }
             });
             if (!posted) {
-                missingUpdate = true;
+                mMissingUpdate = true;
             }
         }
     }
@@ -645,17 +645,17 @@ public class ProcessingFragment extends Fragment {
      */
     private class ProcessInputTask implements Runnable {
         /** Input string of newline separated integers. */
-        private final String input;
+        private final String mInput;
         /** File input URI. */
-        private final Uri fileUri;
+        private final Uri mFileUri;
 
         /**
          * Constructor for processing an input string.
          * @param input the input string to be processed
          */
         ProcessInputTask(final String input) {
-            this.input = input;
-            this.fileUri = null;
+            mInput = input;
+            mFileUri = null;
         }
 
         /**
@@ -663,16 +663,16 @@ public class ProcessingFragment extends Fragment {
          * @param fileUri the URI of the file to be processed
          */
         ProcessInputTask(final Uri fileUri) {
-            this.input = null;
-            this.fileUri = fileUri;
+            mInput = null;
+            mFileUri = fileUri;
         }
 
         /**
          * Constructor for processing input from current input reader.
          */
         ProcessInputTask() {
-            this.input = null;
-            this.fileUri = null;
+            mInput = null;
+            mFileUri = null;
         }
 
         /**
@@ -681,100 +681,100 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             try {
-                if (input != null) {
-                    processInputString(input);
-                } else if (fileUri != null) {
+                if (mInput != null) {
+                    processInputString(mInput);
+                } else if (mFileUri != null) {
                     processFileInput();
-                } else if (inputReader != null) {
+                } else if (mInputReader != null) {
                     processSocketInput();
                 }
             } catch (NumberFormatException e) {
-                // Call listener for showing error message
-                handler.post(new Runnable() {
+                // Call mListener for showing error message
+                mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (listener != null) {
-                            listener.onInvalidInputNumber();
+                        if (mListener != null) {
+                            mListener.onInvalidInputNumber();
                         }
                     }
                 });
             }
             finishInputProcessing();
-            handler.post(new Runnable() {
+            mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (listener != null) {
-                        listener.onProgressUpdate();
+                    if (mListener != null) {
+                        mListener.onProgressUpdate();
                     }
                 }
             });
         }
 
         /**
-         * Opens the input reader from the inputUri and initializes processing of the reader.
+         * Opens the input reader from the mInputUri and initializes processing of the reader.
          */
         private void processFileInput() {
-            inputUri = fileUri;
+            mInputUri = mFileUri;
             try {
-                InputStream stream = getActivity().getContentResolver().openInputStream(inputUri);
+                InputStream stream = getActivity().getContentResolver().openInputStream(mInputUri);
                 if (stream == null) {
                     throw new NullPointerException();
                 }
-                inputReader = new BufferedReader(new InputStreamReader(stream));
+                mInputReader = new BufferedReader(new InputStreamReader(stream));
             } catch (FileNotFoundException | NullPointerException e) {
                 abortFileInput();
                 return;
             }
             try {
-                while (inputReader.ready() && processingEnabled) {
-                    String nextInput = inputReader.readLine();
+                while (mInputReader.ready() && mProcessingEnabled) {
+                    String nextInput = mInputReader.readLine();
                     if (nextInput == null) {
                         break;
                     }
                     processInputString(nextInput);
                 }
-                inputReader.close();
+                mInputReader.close();
             } catch (IOException | NullPointerException e) {
                 abortFileInput();
             }
             try {
-                inputReader.close();
+                mInputReader.close();
             } catch (IOException e) {
-                // We do not need to do anything more with this inputReader
+                // We do not need to do anything more with this mInputReader
             }
-            inputReader = null;
+            mInputReader = null;
         }
 
         /**
          * Reads input from the input reader and assembles an input string to be processed.
          */
         private void processSocketInput() {
-            connectionLock.lock();
+            mConnectionLock.lock();
             try {
-                while (clientSocket != null && !clientSocket.isClosed()) {
-                    String nextInput = inputReader.readLine();
+                while (mClientSocket != null && !mClientSocket.isClosed()) {
+                    String nextInput = mInputReader.readLine();
                     if (nextInput == null) {
                         break;
                     }
                     try {
                         processInputString(nextInput);
                     } catch (NumberFormatException e) {
-                        // Call listener for showing error message
-                        handler.post(new Runnable() {
+                        // Call mListener for showing error message
+                        mHandler.post(new Runnable() {
                             @Override
                             public void run() {
-                                if (listener != null) {
-                                    listener.onInvalidInputNumber();
+                                if (mListener != null) {
+                                    mListener.onInvalidInputNumber();
                                 }
                             }
                         });
                     }
                 }
-                disconnected.signal();
+                mDisconnected.signal();
             } catch (IOException | NullPointerException e) {
                 // Ignore exception
             } finally {
-                connectionLock.unlock();
+                mConnectionLock.unlock();
             }
         }
 
@@ -782,23 +782,23 @@ public class ProcessingFragment extends Fragment {
          * Aborts file input processing and updates the user interface.
          */
         private void abortFileInput() {
-            if (inputReader != null) {
+            if (mInputReader != null) {
                 try {
-                    inputReader.close();
+                    mInputReader.close();
                 } catch (IOException e) {
-                    // We do not need to do anything more with this inputReader
+                    // We do not need to do anything more with this mInputReader
                 }
-                inputReader = null;
+                mInputReader = null;
             }
-            if (inputUri != null) {
-                inputUri = null;
+            if (mInputUri != null) {
+                mInputUri = null;
             }
-            handler.post(new Runnable() {
+            mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (listener != null) {
+                    if (mListener != null) {
                         // Abort file input processing
-                        listener.onFileInputAborted();
+                        mListener.onFileInputAborted();
                     }
                 }
             });
@@ -811,15 +811,15 @@ public class ProcessingFragment extends Fragment {
         private void processInputString(String inputString) {
             NumberSequence inputNumbers;
             String[] stringNumbers = inputString.split("\n");
-            inputNumbers = new NumberSequence(stringNumbers, numberType);
+            inputNumbers = new NumberSequence(stringNumbers, mNumberType);
             NumberSequence.NumberType inputNumberType = inputNumbers.getNumberType();
-            if (inputNumberType != numberType) {
+            if (inputNumberType != mNumberType) {
                 // Reformat history numbers
-                NumberSequence historyNumbers = new NumberSequence(historyBuffer.toArray(),
-                        numberType);
+                NumberSequence historyNumbers = new NumberSequence(mHistoryBuffer.toArray(),
+                        mNumberType);
                 historyNumbers.formatNumbers(inputNumberType);
-                historyBuffer.clear();
-                numberType = inputNumberType;
+                mHistoryBuffer.clear();
+                mNumberType = inputNumberType;
                 inputNumbers = historyNumbers.concatenate(inputNumbers);
                 showClear();
             }
@@ -828,62 +828,63 @@ public class ProcessingFragment extends Fragment {
 
         /**
          * Processes the given input numbers searching for compatible generator states. The
-         * generator is eventually changed if the flag autoDetect is set and a better generator is
+         * generator is eventually changed if the flag mAutoDetect is set and a better generator is
          * detected.
          * @param inputNumbers the number sequence to be processed
          */
         private void processInputNumbers(NumberSequence inputNumbers) {
             NumberSequence historyPredictionNumbers;
-            if (autoDetect) {
+            if (mAutoDetect) {
                 // Detect best generator and update all states
-                int bestGenerator = randomManager.detectGenerator(inputNumbers, historyBuffer);
-                historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
-                if (bestGenerator != randomManager.getCurrentGeneratorIndex()) {
+                int bestGenerator = mRandomManager.detectGenerator(inputNumbers, mHistoryBuffer);
+                historyPredictionNumbers = mRandomManager.getIncomingPredictionNumbers();
+                if (bestGenerator != mRandomManager.getCurrentGeneratorIndex()) {
                     // Set generator and process complete history
-                    randomManager.setCurrentGeneratorIndex(bestGenerator);
-                    randomManager.resetCurrentGenerator();
-                    NumberSequence historyNumbers = new NumberSequence(historyBuffer.toArray(),
-                            numberType);
-                    randomManager.findCurrentSequence(historyNumbers, null);
-                    NumberSequence replacedNumbers = randomManager.getIncomingPredictionNumbers();
-                    randomManager.findCurrentSequence(inputNumbers, historyBuffer);
-                    historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
+                    mRandomManager.setCurrentGeneratorIndex(bestGenerator);
+                    mRandomManager.resetCurrentGenerator();
+                    NumberSequence historyNumbers = new NumberSequence(mHistoryBuffer.toArray(),
+                            mNumberType);
+                    mRandomManager.findCurrentSequence(historyNumbers, null);
+                    NumberSequence replacedNumbers = mRandomManager.getIncomingPredictionNumbers();
+                    mRandomManager.findCurrentSequence(inputNumbers, mHistoryBuffer);
+                    historyPredictionNumbers = mRandomManager.getIncomingPredictionNumbers();
                     // Post change to user interface
                     showGeneratorChange(historyNumbers, replacedNumbers, bestGenerator);
                 }
             } else {
-                randomManager.findCurrentSequence(inputNumbers, historyBuffer);
-                historyPredictionNumbers = randomManager.getIncomingPredictionNumbers();
+                mRandomManager.findCurrentSequence(inputNumbers, mHistoryBuffer);
+                historyPredictionNumbers = mRandomManager.getIncomingPredictionNumbers();
             }
             // Generate new prediction without updating the state
-            NumberSequence predictionNumbers = randomManager.predict(predictionLength, numberType);
-            historyBuffer.put(inputNumbers.getInternalNumbers());
+            NumberSequence predictionNumbers = mRandomManager.predict(mPredictionLength,
+                    mNumberType);
+            mHistoryBuffer.put(inputNumbers.getInternalNumbers());
             // Post result to user interface
             showInputUpdate(inputNumbers, historyPredictionNumbers, predictionNumbers);
         }
 
         /**
-         * Sends the instruction to clear to the processing listener.
+         * Sends the instruction to clear to the processing mListener.
          */
         private void showClear() {
-            boolean posted = handler.post(new Runnable() {
+            boolean posted = mHandler.post(new Runnable() {
                 @Override
                 public void run() {
                     // Clear all fields
-                    if (listener != null) {
-                        listener.onClear();
+                    if (mListener != null) {
+                        mListener.onClear();
                     } else {
-                        missingUpdate = true;
+                        mMissingUpdate = true;
                     }
                 }
             });
             if (!posted) {
-                missingUpdate = true;
+                mMissingUpdate = true;
             }
         }
 
         /**
-         * Sends the generator change to the processing listener.
+         * Sends the generator change to the processing mListener.
          * @param historyNumbers the complete previous input
          * @param replacedNumbers the complete previous prediction numbers
          * @param bestGenerator index of the best generator
@@ -891,25 +892,25 @@ public class ProcessingFragment extends Fragment {
         private void showGeneratorChange(final NumberSequence historyNumbers,
                                          final NumberSequence replacedNumbers,
                                          final int bestGenerator) {
-            boolean posted = handler.post(new Runnable() {
+            boolean posted = mHandler.post(new Runnable() {
                 @Override
                 public void run() {
                     // Append input numbers to history
-                    if (listener != null) {
-                        listener.onGeneratorChanged(bestGenerator);
-                        listener.onHistoryPredictionReplaced(historyNumbers, replacedNumbers);
+                    if (mListener != null) {
+                        mListener.onGeneratorChanged(bestGenerator);
+                        mListener.onHistoryPredictionReplaced(historyNumbers, replacedNumbers);
                     } else {
-                        missingUpdate = true;
+                        mMissingUpdate = true;
                     }
                 }
             });
             if (!posted) {
-                missingUpdate = true;
+                mMissingUpdate = true;
             }
         }
 
         /**
-         * Sends the processing result to the processing listener.
+         * Sends the processing result to the processing mListener.
          * @param inputNumbers the processed input numbers
          * @param historyPredictionNumbers the prediction numbers corresponding to the input
          * @param predictionNumbers the predicted numbers
@@ -917,20 +918,20 @@ public class ProcessingFragment extends Fragment {
         private void showInputUpdate(final NumberSequence inputNumbers,
                                      final NumberSequence historyPredictionNumbers,
                                      final NumberSequence predictionNumbers) {
-            boolean posted = handler.post(new Runnable() {
+            boolean posted = mHandler.post(new Runnable() {
                 @Override
                 public void run() {
                     // Append input numbers to history
-                    if (listener != null) {
-                        listener.onHistoryChanged(inputNumbers, historyPredictionNumbers);
-                        listener.onPredictionChanged(predictionNumbers);
+                    if (mListener != null) {
+                        mListener.onHistoryChanged(inputNumbers, historyPredictionNumbers);
+                        mListener.onPredictionChanged(predictionNumbers);
                     } else {
-                        missingUpdate = true;
+                        mMissingUpdate = true;
                     }
                 }
             });
             if (!posted) {
-                missingUpdate = true;
+                mMissingUpdate = true;
             }
             writeSocketOutput(predictionNumbers);
         }
@@ -941,16 +942,16 @@ public class ProcessingFragment extends Fragment {
          * @param predictionNumbers the predicted numbers
          */
         private void writeSocketOutput(NumberSequence predictionNumbers) {
-            if (outputWriter != null && predictionNumbers != null) {
+            if (mOutputWriter != null && predictionNumbers != null) {
                 try {
                     // Write numbers to output stream
                     for (int i = 0; i < predictionNumbers.length(); i++) {
-                        outputWriter.write(predictionNumbers.toString(i));
-                        outputWriter.newLine();
+                        mOutputWriter.write(predictionNumbers.toString(i));
+                        mOutputWriter.newLine();
                     }
                     // Finish this sequence of numbers with an additional newline
-                    outputWriter.newLine();
-                    outputWriter.flush();
+                    mOutputWriter.newLine();
+                    mOutputWriter.flush();
                 } catch (IOException | NullPointerException e) {
                     // Ignore unsuccessful writes
                 }
@@ -969,23 +970,23 @@ public class ProcessingFragment extends Fragment {
         public void run() {
             // Generate new prediction without updating the state
             final NumberSequence predictionNumbers;
-            if (historyBuffer.length() > 0) {
-                predictionNumbers = randomManager.predict(predictionLength, numberType);
+            if (mHistoryBuffer.length() > 0) {
+                predictionNumbers = mRandomManager.predict(mPredictionLength, mNumberType);
             } else {
                 predictionNumbers = null;
             }
-            boolean posted = handler.post(new Runnable() {
+            boolean posted = mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (!missingUpdate && listener != null) {
-                        listener.onPredictionChanged(predictionNumbers);
+                    if (!mMissingUpdate && mListener != null) {
+                        mListener.onPredictionChanged(predictionNumbers);
                     } else {
-                        missingUpdate = true;
+                        mMissingUpdate = true;
                     }
                 }
             });
             if (!posted) {
-                missingUpdate = true;
+                mMissingUpdate = true;
             }
         }
     }
@@ -999,34 +1000,35 @@ public class ProcessingFragment extends Fragment {
          */
         @Override
         public void run() {
-            connectionLock.lock();
+            mConnectionLock.lock();
             try {
                 try {
-                    serverSocket = new ServerSocket(serverPort);
+                    mServerSocket = new ServerSocket(mServerPort);
                 } catch (IOException e) {
                     abortSocketInput();
                     return;
                 }
                 while (!Thread.currentThread().isInterrupted()) {
                     String status;
-                    if (clientSocket == null || clientSocket.isClosed()) {
+                    if (mClientSocket == null || mClientSocket.isClosed()) {
                         try {
                             // Display information about the server socket
                             status = getResources().getString(R.string.server_listening) + " "
-                                    + Integer.toString(serverPort);
+                                    + Integer.toString(mServerPort);
                             postStatus(status);
-                            clientSocket = serverSocket.accept();
+                            mClientSocket = mServerSocket.accept();
                             status = getResources().getString(R.string.client_connected);
                             postStatus(status);
-                            InputStream inputStream = clientSocket.getInputStream();
-                            inputReader = new BufferedReader(new InputStreamReader(inputStream));
-                            OutputStream outputStream = clientSocket.getOutputStream();
-                            outputWriter = new BufferedWriter(new OutputStreamWriter(outputStream));
+                            InputStream inputStream = mClientSocket.getInputStream();
+                            mInputReader = new BufferedReader(new InputStreamReader(inputStream));
+                            OutputStream outputStream = mClientSocket.getOutputStream();
+                            mOutputWriter = new BufferedWriter(new OutputStreamWriter(
+                                    outputStream));
                         } catch (IOException e) {
                             closeClient();
                             continue;
                         }
-                        boolean posted = handler.post(new Runnable() {
+                        boolean posted = mHandler.post(new Runnable() {
                             @Override
                             public void run() {
                                 processInputSocket();
@@ -1038,7 +1040,7 @@ public class ProcessingFragment extends Fragment {
                         }
                     }
                     try {
-                        disconnected.await();
+                        mDisconnected.await();
                         closeClient();
                         status = getResources().getString(R.string.client_disconnected);
                         postStatus(status);
@@ -1047,7 +1049,7 @@ public class ProcessingFragment extends Fragment {
                     }
                 }
             } finally {
-                connectionLock.unlock();
+                mConnectionLock.unlock();
                 closeSockets();
             }
         }
@@ -1057,11 +1059,11 @@ public class ProcessingFragment extends Fragment {
          * @param status the status message
          */
         private void postStatus(final String status) {
-            handler.post(new Runnable() {
+            mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (listener != null) {
-                        listener.onSocketStatusChanged(status);
+                    if (mListener != null) {
+                        mListener.onSocketStatusChanged(status);
                     }
                 }
             });
@@ -1072,11 +1074,11 @@ public class ProcessingFragment extends Fragment {
          */
         private void abortSocketInput() {
             closeSockets();
-            handler.post(new Runnable() {
+            mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (listener != null) {
-                        listener.onSocketInputAborted();
+                    if (mListener != null) {
+                        mListener.onSocketInputAborted();
                     }
                 }
             });

@@ -43,25 +43,27 @@ The following Python program can be used to test socket input.  The
 program samples numbers from the standard Python pseudo random number
 generator and sends them to a network socket:
 ```python
+from __future__ import print_function
 import random
 import socket
 
-HOST = 'localhost' # host name of Android device
-PORT = 6869 # default port
+HOST = 'localhost' # Host name of Android device
+PORT = 6869 # Default port
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
-fs = s.makefile() # buffer for readline
+fs = s.makefile() # Buffer for readline
 for i in range(0, 700):
-    # sample bits from generator
+    # Sample bits from generator
     r = random.getrandbits(32)
-    # conversion to signed 32 bit integer
-    if (r & 0x80000000):
+    # Conversion to signed 32 bit integer
+    if r & 0x80000000:
         r = -0x100000000 + r
-    s.sendall(str(r)+'\n') # send number string
-    # read and print predictions
+    # Send number string
+    s.sendall(str(r) + '\n')
+    # Read and print predictions
     for j in range(0, 9): # 8 predictions and newline
         l = fs.readline()
-        print l,
+        print(l, end='')
 s.close()
 ```
 Start the app on the Android device and set the input spinner from
@@ -90,7 +92,7 @@ License
 -------
 
 ```text
-Copyright (C) 2015, 2016 Arno Onken
+Copyright (C) 2015-2017 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

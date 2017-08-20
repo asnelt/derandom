@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,23 +24,23 @@ import java.util.List;
  */
 class LinearCongruentialGenerator extends RandomNumberGenerator {
     /** Multiplier parameter. */
-    private final long multiplier;
+    private final long mMultiplier;
     /** Human readable name of multiplier parameter. */
     private static final String MULTIPLIER_NAME = "Multiplier";
     /** Increment parameter. */
-    private final long increment;
+    private final long mIncrement;
     /** Human readable name of increment parameter. */
     private static final String INCREMENT_NAME = "Increment";
     /** Modulus parameter. */
-    private final long modulus;
+    private final long mModulus;
     /** Human readable name of modulus parameter. */
     private static final String MODULUS_NAME = "Modulus";
     /** Index of start bit for output. */
-    private final int bitRangeStart;
+    private final int mBitRangeStart;
     /** Human readable name of bit range start parameter. */
     private static final String BIT_RANGE_START_NAME = "Bit range start";
     /** Index of stop bit for output. */
-    private final int bitRangeStop;
+    private final int mBitRangeStop;
     /** Human readable name of bit range stop parameter. */
     private static final String BIT_RANGE_STOP_NAME = "Bit range stop";
     /** Human readable name of state. */
@@ -53,13 +53,13 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     /** The parameter names as a list. */
     private static final List PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
     /** Internal state. */
-    private volatile long state;
+    private volatile long mState;
     /** Index of most significant modulus bit. */
-    private final int modulusBitRangeStop;
+    private final int mModulusBitRangeStop;
     /** Initial seed of the generator. */
-    private final long initialSeed;
+    private final long mInitialSeed;
     /** Bit mask based on bit range. */
-    private volatile long mask;
+    private volatile long mMask;
 
     /**
      * Constructor initializing all parameters.
@@ -74,14 +74,14 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     LinearCongruentialGenerator(String name, long multiplier, long increment, long modulus,
                                 long seed, int bitRangeStart, int bitRangeStop) {
         super(name);
-        this.multiplier = multiplier;
-        this.increment = increment;
+        mMultiplier = multiplier;
+        mIncrement = increment;
         if (modulus == 0L) {
             throw new IllegalArgumentException("modulus must not be zero");
         }
-        this.modulus = modulus;
-        modulusBitRangeStop = Long.SIZE - Long.numberOfLeadingZeros(modulus) - 1;
-        this.initialSeed = seed;
+        mModulus = modulus;
+        mModulusBitRangeStop = Long.SIZE - Long.numberOfLeadingZeros(modulus) - 1;
+        mInitialSeed = seed;
         setState(seed);
         // Check index range
         if (bitRangeStart < 0) {
@@ -95,13 +95,13 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
             throw new IllegalArgumentException(
                     "bitRangeStart must not be greater than bitRangeStop");
         }
-        this.bitRangeStart = bitRangeStart;
-        this.bitRangeStop = bitRangeStop;
+        mBitRangeStart = bitRangeStart;
+        mBitRangeStop = bitRangeStop;
         // Construct bit mask
-        mask = 0L;
+        mMask = 0L;
         for (int i = bitRangeStart; i <= bitRangeStop; i++) {
             // Set bit i
-            mask |= (1L << i);
+            mMask |= (1L << i);
         }
     }
 
@@ -111,7 +111,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     @Override
     public synchronized void reset() {
         super.reset();
-        setState(initialSeed);
+        setState(mInitialSeed);
     }
 
     /**
@@ -119,7 +119,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @param state the complete state of the generator
      */
     private synchronized void setState(long state) {
-        this.state = state;
+        mState = state;
     }
 
     /**
@@ -138,12 +138,12 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     @Override
     public long[] getParameters() {
         long[] parameters = new long[PARAMETER_NAMES_LIST.size()];
-        parameters[PARAMETER_NAMES_LIST.indexOf(MULTIPLIER_NAME)] = multiplier;
-        parameters[PARAMETER_NAMES_LIST.indexOf(INCREMENT_NAME)] = increment;
-        parameters[PARAMETER_NAMES_LIST.indexOf(MODULUS_NAME)] = modulus;
-        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_START_NAME)] = (long) bitRangeStart;
-        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_STOP_NAME)] = (long) bitRangeStop;
-        parameters[PARAMETER_NAMES_LIST.indexOf(STATE_NAME)] = state;
+        parameters[PARAMETER_NAMES_LIST.indexOf(MULTIPLIER_NAME)] = mMultiplier;
+        parameters[PARAMETER_NAMES_LIST.indexOf(INCREMENT_NAME)] = mIncrement;
+        parameters[PARAMETER_NAMES_LIST.indexOf(MODULUS_NAME)] = mModulus;
+        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_START_NAME)] = (long) mBitRangeStart;
+        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_STOP_NAME)] = (long) mBitRangeStop;
+        parameters[PARAMETER_NAMES_LIST.indexOf(STATE_NAME)] = mState;
         return parameters;
     }
 
@@ -159,7 +159,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
             throw new IllegalArgumentException();
         }
         long[] randomNumbers = new long[number];
-        long peekState = state;
+        long peekState = mState;
         for (int i = 0; i < number; i++) {
             peekState = nextState(peekState);
             // Set output bits
@@ -230,8 +230,8 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      */
     @Override
     public synchronized long next() {
-        state = nextState(state);
-        return calculateOutput(state);
+        mState = nextState(mState);
+        return calculateOutput(mState);
     }
 
     /**
@@ -239,7 +239,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @return the word size
      */
     protected int getWordSize() {
-        return bitRangeStop - bitRangeStart + 1;
+        return mBitRangeStop - mBitRangeStart + 1;
     }
 
     /**
@@ -249,7 +249,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     @Override
     protected long[] getState() {
         long[] state = new long[1];
-        state[0] = this.state;
+        state[0] = mState;
         return state;
     }
 
@@ -262,7 +262,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
         if (state == null || state.length < 1) {
             throw new IllegalArgumentException();
         }
-        this.state = state[0];
+        mState = state[0];
     }
 
     /**
@@ -273,16 +273,16 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      */
     private synchronized long findState(long number, long successor) {
         // Undo output shift
-        number <<= bitRangeStart;
+        number <<= mBitRangeStart;
         // Number of leading bits that are hidden
-        int leadingBits = modulusBitRangeStop - bitRangeStop;
+        int leadingBits = mModulusBitRangeStop - mBitRangeStop;
         if (leadingBits < 0) {
             leadingBits = 0;
         }
         // Try all possible states
         for (long j = 0; j < (1 << leadingBits); j++) {
-            long leadingState = (j << (bitRangeStop + 1)) | number;
-            for (long i = 0; i < (1 << bitRangeStart); i++) {
+            long leadingState = (j << (mBitRangeStop + 1)) | number;
+            for (long i = 0; i < (1 << mBitRangeStart); i++) {
                 long state = leadingState | i;
                 state = nextState(state);
                 if (calculateOutput(state) == successor) {
@@ -300,7 +300,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @return the output of the generator
      */
     private long calculateOutput(long state) {
-        return (state & mask) >> bitRangeStart;
+        return (state & mMask) >> mBitRangeStart;
     }
 
     /**
@@ -309,6 +309,6 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @return the next state of the generator
      */
     private long nextState(long state) {
-        return (multiplier * state + increment) % modulus;
+        return (mMultiplier * state + mIncrement) % mModulus;
     }
 }

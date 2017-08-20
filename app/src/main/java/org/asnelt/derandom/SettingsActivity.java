@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,9 +55,9 @@ public class SettingsActivity extends PreferenceActivity
     public static final String KEY_PREF_SOCKET_PORT = "pref_socket_port";
 
     /** Delegate for enabling an action bar. */
-    private AppCompatDelegate delegate;
+    private AppCompatDelegate mDelegate;
     /** Reference to a SettingsFragment if on Honeycomb or newer. */
-    private Object fragment;
+    private Object mFragment;
 
     /**
      * Initializes the activity.
@@ -68,13 +68,7 @@ public class SettingsActivity extends PreferenceActivity
         getDelegate().installViewFactory();
         getDelegate().onCreate(savedInstanceState);
         super.onCreate(savedInstanceState);
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-            fragment = null;
-            //noinspection deprecation
-            addPreferencesFromResource(R.xml.preferences);
-        } else {
-            createPreferenceFragment();
-        }
+        createPreferenceFragment();
     }
 
     /**
@@ -94,12 +88,7 @@ public class SettingsActivity extends PreferenceActivity
     protected void onResume() {
         super.onResume();
         SharedPreferences preferences;
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-            //noinspection deprecation
-            preferences = getPreferenceScreen().getSharedPreferences();
-        } else {
-            preferences = getFragmentSharedPreferences();
-        }
+        preferences = getFragmentSharedPreferences();
         preferences.registerOnSharedPreferenceChangeListener(this);
         // Initialize summaries
         onSharedPreferenceChanged(preferences, KEY_PREF_PREDICTION_LENGTH);
@@ -115,12 +104,7 @@ public class SettingsActivity extends PreferenceActivity
     protected void onPause() {
         super.onPause();
         SharedPreferences preferences;
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-            //noinspection deprecation
-            preferences = getPreferenceScreen().getSharedPreferences();
-        } else {
-            preferences = getFragmentSharedPreferences();
-        }
+        preferences = getFragmentSharedPreferences();
         preferences.unregisterOnSharedPreferenceChangeListener(this);
     }
 
@@ -132,12 +116,7 @@ public class SettingsActivity extends PreferenceActivity
     @Override
     public void onSharedPreferenceChanged(SharedPreferences preferences, String key) {
         Preference preference;
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-            //noinspection deprecation
-            preference = findPreference(key);
-        } else {
-            preference = findFragmentPreference(key);
-        }
+        preference = findFragmentPreference(key);
         switch (key) {
             case KEY_PREF_PREDICTION_LENGTH:
             case KEY_PREF_HISTORY_LENGTH:
@@ -216,7 +195,7 @@ public class SettingsActivity extends PreferenceActivity
         ViewGroup rootView = (ViewGroup) getWindow().getDecorView().getRootView();
         LayoutInflater inflater = getLayoutInflater();
         ViewGroup view = (ViewGroup) inflater.inflate(R.layout.activity_settings, rootView, false);
-        ViewGroup preferencesLayout = (ViewGroup) view.findViewById(R.id.preferences_layout);
+        ViewGroup preferencesLayout = view.findViewById(R.id.preferences_layout);
         inflater.inflate(layoutResID, preferencesLayout, true);
         getDelegate().setContentView(view);
     }
@@ -349,10 +328,10 @@ public class SettingsActivity extends PreferenceActivity
      * @return the delegate
      */
     private AppCompatDelegate getDelegate() {
-        if (delegate == null) {
-            delegate = AppCompatDelegate.create(this, null);
+        if (mDelegate == null) {
+            mDelegate = AppCompatDelegate.create(this, null);
         }
-        return delegate;
+        return mDelegate;
     }
 
     /**
@@ -360,9 +339,9 @@ public class SettingsActivity extends PreferenceActivity
      */
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private void createPreferenceFragment() {
-        fragment = new SettingsFragment();
+        mFragment = new SettingsFragment();
         getFragmentManager().beginTransaction().replace(R.id.preferences_layout,
-                (SettingsFragment) fragment).commit();
+                (SettingsFragment) mFragment).commit();
     }
 
     /**
@@ -371,7 +350,7 @@ public class SettingsActivity extends PreferenceActivity
      */
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private SharedPreferences getFragmentSharedPreferences() {
-        return ((SettingsFragment) fragment).getPreferenceScreen().getSharedPreferences();
+        return ((SettingsFragment) mFragment).getPreferenceScreen().getSharedPreferences();
     }
 
     /**
@@ -381,7 +360,7 @@ public class SettingsActivity extends PreferenceActivity
      */
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private Preference findFragmentPreference(String key) {
-        return ((SettingsFragment) fragment).findPreference(key);
+        return ((SettingsFragment) mFragment).findPreference(key);
     }
 
     /**

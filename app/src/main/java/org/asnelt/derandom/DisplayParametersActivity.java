@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,8 +59,7 @@ public class DisplayParametersActivity extends AppCompatActivity {
             parameters = new long[0];
         }
 
-        ScrollView scrollViewParameters = (ScrollView) view.findViewById(
-                R.id.scroll_view_parameters);
+        ScrollView scrollViewParameters = view.findViewById(R.id.scroll_view_parameters);
         // Add layout
         LinearLayout layoutParameters = new LinearLayout(this);
         layoutParameters.setOrientation(LinearLayout.VERTICAL);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ public class HistoryView extends NumberSequenceView {
     /**
      * Interface for listening to scroll change events.
      */
-    public interface HistoryViewListener {
+    interface HistoryViewListener {
         /**
          * Called in response to a scroll event.
          * @param view the origin of the scroll event
@@ -45,11 +45,11 @@ public class HistoryView extends NumberSequenceView {
     }
 
     /** A listener to be notified when a scroll event occurs. */
-    private HistoryViewListener historyViewListener = null;
+    private HistoryViewListener mHistoryViewListener = null;
     /** Flag for showing colored numbers. */
-    private boolean colored = false;
+    private boolean mColored = false;
     /** Maximum number of numbers that can be stored. */
-    int capacity = 0;
+    int mCapacity = 0;
 
     /**
      * Standard constructor for a HistoryView.
@@ -83,11 +83,11 @@ public class HistoryView extends NumberSequenceView {
      * @param historyViewListener the HistoryViewListener to be notified
      */
     public void setHistoryViewListener(HistoryViewListener historyViewListener) {
-        this.historyViewListener = historyViewListener;
+        mHistoryViewListener = historyViewListener;
     }
 
     /**
-     * Called in response to a scroll event. Notifies the historyViewListener if present.
+     * Called in response to a scroll event. Notifies the mHistoryViewListener if present.
      * @param horizontal current horizontal scroll origin
      * @param vertical current vertical scroll origin
      * @param oldHorizontal old horizontal scroll origin
@@ -97,8 +97,8 @@ public class HistoryView extends NumberSequenceView {
     protected void onScrollChanged(int horizontal, int vertical, int oldHorizontal,
                                    int oldVertical) {
         super.onScrollChanged(horizontal, vertical, oldHorizontal, oldVertical);
-        if (historyViewListener != null) {
-            historyViewListener.onScrollChanged(this, horizontal, vertical, oldHorizontal,
+        if (mHistoryViewListener != null) {
+            mHistoryViewListener.onScrollChanged(this, horizontal, vertical, oldHorizontal,
                     oldVertical);
         }
     }
@@ -118,7 +118,7 @@ public class HistoryView extends NumberSequenceView {
                 scrollTo(0, layout.getHeight());
             }
         }
-        this.capacity = capacity;
+        mCapacity = capacity;
     }
 
     /**
@@ -126,7 +126,7 @@ public class HistoryView extends NumberSequenceView {
      * @return true if the numbers are colored
      */
     public boolean isColored() {
-        return colored;
+        return mColored;
     }
 
     /**
@@ -135,7 +135,7 @@ public class HistoryView extends NumberSequenceView {
      * @param correctSequence corresponding correct numbers separated by newline characters
      */
     public void enableColor(String correctSequence) {
-        colored = true;
+        mColored = true;
         if (correctSequence == null || correctSequence.length() == 0 || getText().length() == 0) {
             return;
         }
@@ -172,7 +172,7 @@ public class HistoryView extends NumberSequenceView {
      * Disables color for displaying the numbers.
      */
     public void disableColor() {
-        colored = false;
+        mColored = false;
         setText(getText().toString());
     }
 
@@ -198,10 +198,10 @@ public class HistoryView extends NumberSequenceView {
         }
         int length = numberSequence.length();
         // Number of lines to remove from beginning of textView
-        int linesToRemove = getLineCount() + length - capacity;
+        int linesToRemove = getLineCount() + length - mCapacity;
         removeExcessNumbers(linesToRemove);
         // Offset to first number to append
-        int offset = length - capacity;
+        int offset = length - mCapacity;
         if (offset < 0) {
             offset = 0;
         }
@@ -249,7 +249,7 @@ public class HistoryView extends NumberSequenceView {
         }
         int length = numberSequence.length();
         // Check whether the numbers should be colored
-        boolean useColor = colored && correctNumberSequence != null
+        boolean useColor = mColored && correctNumberSequence != null
                 && correctNumberSequence.length() >= length;
         // Check whether we need a newline at the beginning
         boolean initialNewline = getText().length() > 0;

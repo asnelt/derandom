@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015, 2016 Arno Onken
+Copyright (C) 2015-2017 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -172,6 +172,6 @@ limitations under the License.
         android:layout_toLeftOf="@+id/view_horizontal_center"
         android:layout_toStartOf="@+id/view_horizontal_center"
         android:visibility="gone"
-        style="@android:style/Widget.ProgressBar" />
+        style="@style/Widget.AppCompat.ProgressBar" />
 
 </RelativeLayout>

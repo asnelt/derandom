@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Arno Onken
+ * Copyright (C) 2015-2017 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,9 +43,9 @@ class NumberSequence {
     }
 
     /** The number type of the sequence. */
-    private NumberType numberType;
+    private NumberType mNumberType;
     /** Internal bitwise representation of the numbers. */
-    private long[] internalNumbers;
+    private long[] mInternalNumbers;
 
     /**
      * Constructs an empty number sequence with number type raw.
@@ -59,8 +59,8 @@ class NumberSequence {
      * @param numberType the number type of the number sequence
      */
     NumberSequence(NumberType numberType) {
-        this.internalNumbers = new long[0];
-        this.numberType = numberType;
+        mInternalNumbers = new long[0];
+        mNumberType = numberType;
     }
 
     /**
@@ -69,8 +69,8 @@ class NumberSequence {
      * @param numberType the number type of the sequence
      */
     NumberSequence(long[] numbers, NumberType numberType) {
-        this.internalNumbers = numbers;
-        this.numberType = numberType;
+        mInternalNumbers = numbers;
+        mNumberType = numberType;
     }
 
     /**
@@ -79,38 +79,38 @@ class NumberSequence {
      * @param numberType the number type of the sequence
      */
     NumberSequence(String[] numberStrings, NumberType numberType) {
-        this.numberType = numberType;
-        internalNumbers = new long[numberStrings.length];
+        mNumberType = numberType;
+        mInternalNumbers = new long[numberStrings.length];
         // Parse numbers
-        for (int i = 0; i < internalNumbers.length; i++) {
+        for (int i = 0; i < mInternalNumbers.length; i++) {
             try {
                 switch (numberType) {
                     case RAW:
-                        internalNumbers[i] = parseNumberWithType(numberStrings[i]);
+                        mInternalNumbers[i] = parseNumberWithType(numberStrings[i]);
                         break;
                     case INTEGER:
-                        internalNumbers[i] = Integer.parseInt(numberStrings[i]);
+                        mInternalNumbers[i] = Integer.parseInt(numberStrings[i]);
                         break;
                     case LONG:
-                        internalNumbers[i] = Long.parseLong(numberStrings[i]);
+                        mInternalNumbers[i] = Long.parseLong(numberStrings[i]);
                         break;
                     case FLOAT:
                         if (isFloatString(numberStrings[i])) {
-                            internalNumbers[i] = Float.floatToIntBits(Float.parseFloat(
+                            mInternalNumbers[i] = Float.floatToIntBits(Float.parseFloat(
                                     numberStrings[i]));
                         } else {
-                            internalNumbers[i] = parseNumberWithType(numberStrings[i]);
+                            mInternalNumbers[i] = parseNumberWithType(numberStrings[i]);
                         }
                         break;
                     case DOUBLE:
-                        internalNumbers[i] = Double.doubleToLongBits(Double.parseDouble(
+                        mInternalNumbers[i] = Double.doubleToLongBits(Double.parseDouble(
                                 numberStrings[i]));
                         break;
                     default:
-                        internalNumbers[i] = Long.parseLong(numberStrings[i]);
+                        mInternalNumbers[i] = Long.parseLong(numberStrings[i]);
                 }
             } catch (NumberFormatException e) {
-                internalNumbers[i] = parseNumberWithType(numberStrings[i]);
+                mInternalNumbers[i] = parseNumberWithType(numberStrings[i]);
             }
         }
     }
@@ -133,24 +133,24 @@ class NumberSequence {
      */
     void formatNumbers(NumberType numberType, int wordSize) {
         // Eventually reverse current format
-        if (this.numberType != numberType) {
-            internalNumbers = getSequenceWords(wordSize);
+        if (mNumberType != numberType) {
+            mInternalNumbers = getSequenceWords(wordSize);
             // Apply new format
-            this.numberType = numberType;
+            mNumberType = numberType;
             switch (numberType) {
                 case INTEGER:
                 case UNSIGNED_INTEGER:
-                    this.internalNumbers = formatIntegers(internalNumbers);
+                    mInternalNumbers = formatIntegers(mInternalNumbers);
                     break;
                 case LONG:
                 case UNSIGNED_LONG:
-                    this.internalNumbers = assembleLongs(internalNumbers, wordSize);
+                    mInternalNumbers = assembleLongs(mInternalNumbers, wordSize);
                     break;
                 case FLOAT:
-                    this.internalNumbers = formatFloats(internalNumbers, wordSize);
+                    mInternalNumbers = formatFloats(mInternalNumbers, wordSize);
                     break;
                 case DOUBLE:
-                    this.internalNumbers = assembleDoubles(internalNumbers, wordSize);
+                    mInternalNumbers = assembleDoubles(mInternalNumbers, wordSize);
             }
         }
     }
@@ -160,8 +160,8 @@ class NumberSequence {
      */
     void fixNumberFormat() {
         // Eventually add complement integer extension for negative numbers
-        if (numberType == NumberType.INTEGER || numberType == NumberType.UNSIGNED_INTEGER) {
-            internalNumbers = formatIntegers(internalNumbers);
+        if (mNumberType == NumberType.INTEGER || mNumberType == NumberType.UNSIGNED_INTEGER) {
+            mInternalNumbers = formatIntegers(mInternalNumbers);
         }
     }
 
@@ -170,7 +170,7 @@ class NumberSequence {
      * @return the number type of the sequence
      */
     NumberType getNumberType() {
-        return numberType;
+        return mNumberType;
     }
 
     /**
@@ -178,7 +178,7 @@ class NumberSequence {
      * @return true if number sequence is empty
      */
     boolean isEmpty() {
-        return (internalNumbers == null || internalNumbers.length == 0);
+        return (mInternalNumbers == null || mInternalNumbers.length == 0);
     }
 
     /**
@@ -191,7 +191,7 @@ class NumberSequence {
             return false;
         }
         for (int i = 0; i < length(); i++) {
-            if (internalNumbers[i] != numberSequence.getInternalNumber(i)) {
+            if (mInternalNumbers[i] != numberSequence.getInternalNumber(i)) {
                 return false;
             }
         }
@@ -211,10 +211,10 @@ class NumberSequence {
         int firstLength = length();
         int secondLength = numberSequence.length();
         long[] newInternalNumbers = new long[firstLength + secondLength];
-        System.arraycopy(internalNumbers, 0, newInternalNumbers, 0, firstLength);
+        System.arraycopy(mInternalNumbers, 0, newInternalNumbers, 0, firstLength);
         System.arraycopy(numberSequence.getInternalNumbers(), 0, newInternalNumbers, firstLength,
                 secondLength);
-        internalNumbers = newInternalNumbers;
+        mInternalNumbers = newInternalNumbers;
         return this;
     }
 
@@ -227,7 +227,7 @@ class NumberSequence {
         int minimumLength = Math.min(length(), numberSequence.length());
         int matches = 0;
         for (int i = 0; i < minimumLength; i++) {
-            if (internalNumbers[i] == numberSequence.getInternalNumber(i)) {
+            if (mInternalNumbers[i] == numberSequence.getInternalNumber(i)) {
                 matches++;
             }
         }
@@ -239,10 +239,10 @@ class NumberSequence {
      * @return the number of numbers in the sequence
      */
     public int length() {
-        if (internalNumbers == null) {
+        if (mInternalNumbers == null) {
             return 0;
         } else {
-            return internalNumbers.length;
+            return mInternalNumbers.length;
         }
     }
 
@@ -253,10 +253,10 @@ class NumberSequence {
      * @throws IndexOutOfBoundsException if index is not a valid index of the sequence
      */
     long getInternalNumber(int index) throws IndexOutOfBoundsException {
-        if (index < 0 || index > internalNumbers.length) {
+        if (index < 0 || index > mInternalNumbers.length) {
             throw new IndexOutOfBoundsException();
         }
-        return internalNumbers[index];
+        return mInternalNumbers[index];
     }
 
     /**
@@ -264,7 +264,7 @@ class NumberSequence {
      * @return the number sequence in its bitwise long representation
      */
     long[] getInternalNumbers() {
-        return internalNumbers;
+        return mInternalNumbers;
     }
 
     /**
@@ -274,17 +274,17 @@ class NumberSequence {
      * @throws IndexOutOfBoundsException if index is not a valid index of the sequence
      */
     String toString(int index) throws IndexOutOfBoundsException {
-        if (internalNumbers == null || index < 0 || index > internalNumbers.length) {
+        if (mInternalNumbers == null || index < 0 || index > mInternalNumbers.length) {
             throw new IndexOutOfBoundsException();
         }
         String numberString;
-        switch (numberType) {
+        switch (mNumberType) {
             case UNSIGNED_LONG:
-                if (internalNumbers[index] >= 0) {
-                    numberString = Long.toString(internalNumbers[index]);
+                if (mInternalNumbers[index] >= 0) {
+                    numberString = Long.toString(mInternalNumbers[index]);
                 } else {
                     // Use BigInteger to convert to unsigned long string
-                    BigInteger bigNumber = BigInteger.valueOf(internalNumbers[index]);
+                    BigInteger bigNumber = BigInteger.valueOf(mInternalNumbers[index]);
                     if (bigNumber.signum() < 0) {
                         bigNumber = bigNumber.add(TWO_COMPLEMENT);
                     }
@@ -292,13 +292,13 @@ class NumberSequence {
                 }
                 break;
             case FLOAT:
-                numberString = Float.toString(Float.intBitsToFloat((int) internalNumbers[index]));
+                numberString = Float.toString(Float.intBitsToFloat((int) mInternalNumbers[index]));
                 break;
             case DOUBLE:
-                numberString = Double.toString(Double.longBitsToDouble(internalNumbers[index]));
+                numberString = Double.toString(Double.longBitsToDouble(mInternalNumbers[index]));
                 break;
             default:
-                numberString = Long.toString(internalNumbers[index]);
+                numberString = Long.toString(mInternalNumbers[index]);
         }
         return numberString;
     }
@@ -308,8 +308,8 @@ class NumberSequence {
      * @return true if the number type has truncated bits
      */
     boolean hasTruncatedOutput() {
-        return (numberType == NumberSequence.NumberType.FLOAT
-                || numberType == NumberSequence.NumberType.DOUBLE);
+        return (mNumberType == NumberSequence.NumberType.FLOAT
+                || mNumberType == NumberSequence.NumberType.DOUBLE);
     }
 
     /**
@@ -318,19 +318,19 @@ class NumberSequence {
      * @return the number sequence as a sequence of words
      */
     long[] getSequenceWords(int wordSize) {
-        switch (numberType) {
+        switch (mNumberType) {
             case INTEGER:
             case UNSIGNED_INTEGER:
-                return reverseFormatIntegers(internalNumbers);
+                return reverseFormatIntegers(mInternalNumbers);
             case LONG:
             case UNSIGNED_LONG:
-                return disassembleLongs(internalNumbers, wordSize);
+                return disassembleLongs(mInternalNumbers, wordSize);
             case FLOAT:
-                return reverseFormatFloats(internalNumbers, wordSize);
+                return reverseFormatFloats(mInternalNumbers, wordSize);
             case DOUBLE:
-                return disassembleDoubles(internalNumbers, wordSize);
+                return disassembleDoubles(mInternalNumbers, wordSize);
             default:
-                return internalNumbers;
+                return mInternalNumbers;
         }
     }
 
@@ -341,13 +341,13 @@ class NumberSequence {
      * @param wordSize the number of bits to represent in a long
      */
     void setSequenceWord(int index, long word, int wordSize) {
-        switch (numberType) {
+        switch (mNumberType) {
             case LONG:
             case UNSIGNED_LONG:
-                internalNumbers = setLongWord(index, word, internalNumbers, wordSize);
+                mInternalNumbers = setLongWord(index, word, mInternalNumbers, wordSize);
                 break;
             default:
-                internalNumbers[index] = word;
+                mInternalNumbers[index] = word;
         }
     }
 
@@ -360,14 +360,15 @@ class NumberSequence {
         long[] observedBits;
         long wordMask;
         if (wordSize == Long.SIZE) {
+            //noinspection NumericOverflow
             wordMask = (Long.MAX_VALUE << 1) | 1L;
         } else {
             wordMask = (1L << wordSize) - 1L;
         }
-        switch (numberType) {
+        switch (mNumberType) {
             case INTEGER:
             case UNSIGNED_INTEGER:
-                observedBits = new long[internalNumbers.length];
+                observedBits = new long[mInternalNumbers.length];
                 for (int i = 0; i < observedBits.length; i++) {
                     observedBits[i] = wordMask & INTEGER_MASK;
                 }
@@ -375,37 +376,37 @@ class NumberSequence {
             case LONG:
             case UNSIGNED_LONG:
                 if (wordSize > Integer.SIZE) {
-                    observedBits = new long[internalNumbers.length];
+                    observedBits = new long[mInternalNumbers.length];
                     for (int i = 0; i < observedBits.length; i++) {
                         observedBits[i] = wordMask;
                     }
                 } else {
-                    observedBits = new long[internalNumbers.length * 2];
+                    observedBits = new long[mInternalNumbers.length * 2];
                     for (int i = 0; i < observedBits.length; i++) {
                         observedBits[i] = wordMask;
                     }
                 }
                 break;
             case FLOAT:
-                observedBits = new long[internalNumbers.length];
+                observedBits = new long[mInternalNumbers.length];
                 long floatMask = ((1L << FLOAT_RANDOM_BITS) - 1L) << (wordSize - FLOAT_RANDOM_BITS);
-                for (int i = 0; i < internalNumbers.length; i++) {
+                for (int i = 0; i < mInternalNumbers.length; i++) {
                     observedBits[i] = floatMask;
                 }
                 break;
             case DOUBLE:
-                observedBits = new long[internalNumbers.length * 2];
+                observedBits = new long[mInternalNumbers.length * 2];
                 long doubleLowerMask = ((1L << DOUBLE_LOWER_RANDOM_BITS) - 1L)
                         << (wordSize - DOUBLE_LOWER_RANDOM_BITS);
                 long doubleUpperMask = ((1L << DOUBLE_UPPER_RANDOM_BITS) - 1L)
                         << (wordSize - DOUBLE_UPPER_RANDOM_BITS);
-                for (int i = 0; i < internalNumbers.length; i++) {
+                for (int i = 0; i < mInternalNumbers.length; i++) {
                     observedBits[2 * i] = doubleUpperMask;
                     observedBits[2 * i + 1] = doubleLowerMask;
                 }
                 break;
             default:
-                observedBits = new long[internalNumbers.length];
+                observedBits = new long[mInternalNumbers.length];
                 for (int i = 0; i < observedBits.length; i++) {
                     observedBits[i] = wordMask;
                 }
@@ -447,13 +448,13 @@ class NumberSequence {
             if (isFloatString(numberString)) {
                 float value = Float.parseFloat(numberString);
                 if (currentType != NumberSequence.NumberType.FLOAT) {
-                    numberType = NumberType.FLOAT;
+                    mNumberType = NumberType.FLOAT;
                 }
                 number = Float.floatToIntBits(value);
             } else {
                 double value = Double.parseDouble(numberString);
                 if (currentType != NumberSequence.NumberType.DOUBLE) {
-                    numberType = NumberType.DOUBLE;
+                    mNumberType = NumberType.DOUBLE;
                 }
                 number = Double.doubleToLongBits(value);
             }
@@ -468,12 +469,12 @@ class NumberSequence {
             // Find minimum range that can hold the number
             if (number >= Integer.MIN_VALUE && number <= Integer.MAX_VALUE) {
                 if (currentType == NumberSequence.NumberType.RAW) {
-                    numberType = NumberType.INTEGER;
+                    mNumberType = NumberType.INTEGER;
                 }
             } else if (bigNumber.signum() >= 0 && number < (1L << Integer.SIZE)) {
                 if (currentType == NumberSequence.NumberType.RAW
                         || currentType == NumberSequence.NumberType.INTEGER) {
-                    numberType = NumberType.UNSIGNED_INTEGER;
+                    mNumberType = NumberType.UNSIGNED_INTEGER;
                 }
             } else {
                 if (number >= 0 || bigNumber.signum() < 0) {
@@ -481,11 +482,11 @@ class NumberSequence {
                             || currentType == NumberSequence.NumberType.INTEGER
                             || currentType == NumberSequence.NumberType.UNSIGNED_INTEGER)
                     {
-                        numberType = NumberType.LONG;
+                        mNumberType = NumberType.LONG;
                     }
                 } else {
                     // The most significant bit is set, but the number is not negative
-                    numberType = NumberType.UNSIGNED_LONG;
+                    mNumberType = NumberType.UNSIGNED_LONG;
                 }
             }
         }
@@ -522,7 +523,7 @@ class NumberSequence {
         for (int i = 0; i < values.length; i++) {
             numbers[i] = values[i] & INTEGER_MASK;
         }
-        if (numberType == NumberSequence.NumberType.INTEGER) {
+        if (mNumberType == NumberSequence.NumberType.INTEGER) {
             // Add two complement bit extension for negative numbers
             for (int i = 0; i < numbers.length; i++) {
                 if ((numbers[i] >> Integer.SIZE - 1) > 0) {
