@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Copyright (C) 2015-2017 Arno Onken
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<resources>
+
+    <string name="app_name">Derandom</string>
+    <string name="action_settings">Einstellungen</string>
+    <string name="action_refresh">Aktualisieren</string>
+    <string name="action_discard">Verwerfen</string>
+    <string name="action_parameters">Parameter</string>
+    <string name="action_about">Über</string>
+    <string name="input_direct_name">Textfeld</string>
+    <string name="input_file_name">Datei</string>
+    <string name="file_error_message">Datei konnte nicht gelesen werden</string>
+    <string name="number_error_message">Ungültige Eingabezahl</string>
+    <string name="title_activity_display_parameters">Generatorparameter</string>
+    <string name="title_dialog_about">Über</string>
+    <string name="about_positive">OK</string>
+    <string name="version_name">Version</string>
+    <string name="website">Website: http://github.com/asnelt/derandom/</string>
+    <string name="title_activity_settings">Einstellungen</string>
+    <string name="pref_prediction_title">Vorhersage</string>
+    <string name="pref_prediction_length_default_value">8</string>
+    <string name="pref_history_length">Verlaufslänge</string>
+    <string name="pref_history_length_default_value">2048</string>
+    <string name="pref_parameter_base_default">10</string>
+    <string name="pref_socket_port_default_value">6869</string>
+
+</resources>
