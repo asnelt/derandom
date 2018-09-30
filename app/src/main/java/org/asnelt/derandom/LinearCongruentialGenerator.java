@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Arno Onken
+ * Copyright (C) 2015-2018 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,11 +98,12 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
         mBitRangeStart = bitRangeStart;
         mBitRangeStop = bitRangeStop;
         // Construct bit mask
-        mMask = 0L;
+        long mask = 0L;
         for (int i = bitRangeStart; i <= bitRangeStop; i++) {
             // Set bit i
-            mMask |= (1L << i);
+            mask |= (1L << i);
         }
+        mMask = mask;
     }
 
     /**
@@ -238,6 +239,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      * Returns the word size of the generator.
      * @return the word size
      */
+    @Override
     protected int getWordSize() {
         return mBitRangeStop - mBitRangeStart + 1;
     }
@@ -258,6 +260,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
      * @param state the new state
      * @throws IllegalArgumentException if state is empty
      */
+    @Override
     protected synchronized void setState(long[] state) {
         if (state == null || state.length < 1) {
             throw new IllegalArgumentException();

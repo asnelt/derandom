@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Arno Onken
+ * Copyright (C) 2015-2018 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@
 
 package org.asnelt.derandom;
 
+import android.app.Activity;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.support.v4.app.Fragment;
+import androidx.fragment.app.Fragment;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -221,10 +222,20 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
+     * Executes a clear task.
+     */
+    public void clear() {
+        mRandomManager.deactivateAll();
+        mProcessingEnabled = false;
+        mNumberType = NumberSequence.NumberType.RAW;
+        mProcessingExecutor.execute(new ClearTask());
+    }
+
+    /**
      * Sets the currently active generator.
      * @param index index of the currently active generator
      */
-    public void setCurrentGenerator(int index) {
+    void setCurrentGenerator(int index) {
         if (index != mRandomManager.getCurrentGeneratorIndex()) {
             prepareInputProcessing();
             mProcessingExecutor.execute(new UpdateAllTask(index));
@@ -235,7 +246,7 @@ public class ProcessingFragment extends Fragment {
      * Returns human readable names of all generators.
      * @return all generator names
      */
-    public String[] getGeneratorNames() {
+    String[] getGeneratorNames() {
         return mRandomManager.getGeneratorNames();
     }
 
@@ -243,7 +254,7 @@ public class ProcessingFragment extends Fragment {
      * Returns the name of the currently active generator.
      * @return name of the currently active generator
      */
-    public String getCurrentGeneratorName() {
+    String getCurrentGeneratorName() {
         return mRandomManager.getCurrentGeneratorName();
     }
 
@@ -251,7 +262,7 @@ public class ProcessingFragment extends Fragment {
      * Returns the parameter names of the currently active generator.
      * @return all parameter names of the currently active generator
      */
-    public String[] getCurrentParameterNames() {
+    String[] getCurrentParameterNames() {
         return mRandomManager.getCurrentParameterNames();
     }
 
@@ -259,7 +270,7 @@ public class ProcessingFragment extends Fragment {
      * Returns all parameter values of the currently active generator.
      * @return parameter values of the currently active generator
      */
-    public long[] getCurrentParameters() {
+    long[] getCurrentParameters() {
         return mRandomManager.getCurrentParameters();
     }
 
@@ -267,7 +278,7 @@ public class ProcessingFragment extends Fragment {
      * Sets the current input selection index.
      * @param inputSelection the new input selection index
      */
-    public void setInputSelection(int inputSelection) {
+    void setInputSelection(int inputSelection) {
         mInputSelection = inputSelection;
     }
 
@@ -275,7 +286,7 @@ public class ProcessingFragment extends Fragment {
      * Returns the current input selection index.
      * @return the current input selection index
      */
-    public int getInputSelection() {
+    int getInputSelection() {
         return mInputSelection;
     }
 
@@ -283,14 +294,14 @@ public class ProcessingFragment extends Fragment {
      * Returns the current input URI or null if no input URI is set.
      * @return the current input URI
      */
-    public Uri getInputUri() {
+    Uri getInputUri() {
         return mInputUri;
     }
 
     /**
      * Sets the input URI to null.
      */
-    public void resetInputUri() {
+    void resetInputUri() {
         mInputUri = null;
     }
 
@@ -298,7 +309,7 @@ public class ProcessingFragment extends Fragment {
      * Sets the number of numbers to predict.
      * @param predictionLength the number of numbers to predict
      */
-    public void setPredictionLength(int predictionLength) {
+    void setPredictionLength(int predictionLength) {
         if (mPredictionLength != predictionLength) {
             mPredictionLength = predictionLength;
             updatePrediction();
@@ -309,7 +320,7 @@ public class ProcessingFragment extends Fragment {
      * Sets the flag that determines whether the generator is detected automatically..
      * @param autoDetect automatically detect generator if true
      */
-    public void setAutoDetect(boolean autoDetect) {
+    void setAutoDetect(boolean autoDetect) {
         mAutoDetect = autoDetect;
     }
 
@@ -317,7 +328,7 @@ public class ProcessingFragment extends Fragment {
      * Sets the server port. If a server task is running, then it is restarted.
      * @param serverPort the new server port
      */
-    public void setServerPort(int serverPort) {
+    void setServerPort(int serverPort) {
         if (mServerPort != serverPort) {
             mServerPort = serverPort;
             if (mServerFuture != null) {
@@ -331,7 +342,7 @@ public class ProcessingFragment extends Fragment {
      * Determines whether input is currently processed.
      * @return true if input is currently processed
      */
-    public boolean isProcessingInput() {
+    boolean isProcessingInput() {
         return mInputTaskLength > 0;
     }
 
@@ -339,32 +350,22 @@ public class ProcessingFragment extends Fragment {
      * Determines whether a user interface update was missed during a configuration change.
      * @return true if an update was missed
      */
-    public boolean isMissingUpdate() {
+    boolean isMissingUpdate() {
         return mMissingUpdate;
-    }
-
-    /**
-     * Executes a clear task.
-     */
-    public void clear() {
-        mRandomManager.deactivateAll();
-        mProcessingEnabled = false;
-        mNumberType = NumberSequence.NumberType.RAW;
-        mProcessingExecutor.execute(new ClearTask());
     }
 
     /**
      * Executes a change capacity task.
      * @param capacity the new input history capacity
      */
-    public void setCapacity(int capacity) {
+    void setCapacity(int capacity) {
         mProcessingExecutor.execute(new ChangeCapacityTask(capacity));
     }
 
     /**
      * Executes an update task.
      */
-    public void updateAll() {
+    void updateAll() {
         prepareInputProcessing();
         mProcessingExecutor.execute(new UpdateAllTask());
     }
@@ -373,26 +374,17 @@ public class ProcessingFragment extends Fragment {
      * Processes an input string of newline separated integers and calculates a prediction.
      * @param input the input string to be processed
      */
-    public void processInputString(String input) {
+    void processInputString(String input) {
         // Process input in separate thread
         prepareInputProcessing();
         mProcessingExecutor.execute(new ProcessInputTask(input));
     }
 
     /**
-     * Executes a process input task with an input reader.
-     */
-    public void processInputSocket() {
-        // Process input in separate thread
-        prepareInputProcessing();
-        mProcessingExecutor.execute(new ProcessInputTask());
-    }
-
-    /**
      * Opens and processes the input file pointed to by fileUri. Disables direct input.
      * @param fileUri the URI of the file to be processed
      */
-    public void processInputFile(Uri fileUri) {
+    void processInputFile(Uri fileUri) {
         // Process input in separate thread
         prepareInputProcessing();
         mProcessingExecutor.execute(new ProcessInputTask(fileUri));
@@ -401,19 +393,28 @@ public class ProcessingFragment extends Fragment {
     /**
      * Starts the server task and sets the server future.
      */
-    public void startServerTask() {
+    void startServerTask() {
         mServerFuture = mServerExecutor.submit(new ServerTask());
     }
 
     /**
      * Stops the server task and sets the server future to null. Closes all sockets.
      */
-    public void stopServerTask() {
+    void stopServerTask() {
         if (mServerFuture != null) {
             mServerFuture.cancel(true);
             mServerFuture = null;
         }
         closeSockets();
+    }
+
+    /**
+     * Executes a process input task with an input reader.
+     */
+    private void processInputSocket() {
+        // Process input in separate thread
+        prepareInputProcessing();
+        mProcessingExecutor.execute(new ProcessInputTask());
     }
 
     /**
@@ -716,7 +717,11 @@ public class ProcessingFragment extends Fragment {
         private void processFileInput() {
             mInputUri = mFileUri;
             try {
-                InputStream stream = getActivity().getContentResolver().openInputStream(mInputUri);
+                Activity activity = getActivity();
+                if (activity == null) {
+                    throw new NullPointerException();
+                }
+                InputStream stream = activity.getContentResolver().openInputStream(mInputUri);
                 if (stream == null) {
                     throw new NullPointerException();
                 }

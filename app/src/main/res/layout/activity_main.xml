@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015-2017 Arno Onken
+Copyright (C) 2015-2018 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -144,7 +144,8 @@ limitations under the License.
         android:hint="@string/edit_hint"
         android:inputType="textMultiLine"
         android:textSize="14sp"
-        android:layout_alignParentBottom="true" />
+        android:layout_alignParentBottom="true"
+        android:importantForAutofill="no" />
 
     <org.asnelt.derandom.NumberSequenceView
         android:id="@+id/text_prediction"

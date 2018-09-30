@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Arno Onken
+ * Copyright (C) 2015-2018 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -357,6 +357,7 @@ class MersenneTwister extends RandomNumberGenerator {
      * Returns the word size of the generator.
      * @return the word size
      */
+    @Override
     protected int getWordSize() {
         return mWordSize;
     }
@@ -386,6 +387,7 @@ class MersenneTwister extends RandomNumberGenerator {
      * @param newState the new state
      * @throws IllegalArgumentException if state does not have enough elements
      */
+    @Override
     protected synchronized void setState(long[] newState) {
         if (newState == null || newState.length < mState.length() + 1) {
             throw new IllegalArgumentException();

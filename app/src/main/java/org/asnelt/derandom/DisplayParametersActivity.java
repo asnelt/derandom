@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Arno Onken
+ * Copyright (C) 2015-2018 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package org.asnelt.derandom;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -50,10 +50,14 @@ public class DisplayParametersActivity extends AppCompatActivity {
 
         // Extract parameters and names from bundle
         Bundle extras = getIntent().getExtras();
-        String name = extras.getString(MainActivity.EXTRA_GENERATOR_NAME);
-        String[] parameterNames =
-                extras.getStringArray(MainActivity.EXTRA_GENERATOR_PARAMETER_NAMES);
-        long[] parameters = extras.getLongArray(MainActivity.EXTRA_GENERATOR_PARAMETERS);
+        String name = "";
+        String[] parameterNames = null;
+        long[] parameters = null;
+        if (extras != null) {
+            name = extras.getString(MainActivity.EXTRA_GENERATOR_NAME);
+            parameterNames = extras.getStringArray(MainActivity.EXTRA_GENERATOR_PARAMETER_NAMES);
+            parameters = extras.getLongArray(MainActivity.EXTRA_GENERATOR_PARAMETERS);
+        }
         if (parameterNames == null || parameters == null) {
             parameterNames = new String[0];
             parameters = new long[0];

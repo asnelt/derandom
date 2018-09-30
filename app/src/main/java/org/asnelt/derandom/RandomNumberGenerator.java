@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Arno Onken
+ * Copyright (C) 2015-2018 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -167,11 +167,13 @@ abstract class RandomNumberGenerator {
      * Returns the state of the generator.
      * @return the current state
      */
+    @SuppressWarnings("unused")
     protected abstract long[] getState();
 
     /**
      * Sets the state of the generator.
      * @param state the new state
      */
+    @SuppressWarnings("unused")
     protected abstract void setState(long[] state);
 }

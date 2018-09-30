@@ -1,0 +1,3 @@
+Made adjustments for Android 9 Pie.
+Added translation: German (partly by m-rey).
+Added metadata.

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015-2017 Arno Onken
+Copyright (C) 2015-2018 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,27 +16,49 @@ limitations under the License.
 -->
 <resources>
 
-    <string name="app_name">Derandom</string>
+    <string name="input">Eingabe</string>
     <string name="action_settings">Einstellungen</string>
+    <string name="prediction">Vorhersage</string>
+    <string name="edit_hint">Bitte eine Sequenz von Zahlen eingeben, die von einem Pseudozufallszahlengenerator generiert worden ist. Bitte eine Zahl pro Zeile eingeben. Aktualisieren, um eine Vorhersage zu erhalten.</string>
     <string name="action_refresh">Aktualisieren</string>
     <string name="action_discard">Verwerfen</string>
     <string name="action_parameters">Parameter</string>
     <string name="action_about">Über</string>
     <string name="input_direct_name">Textfeld</string>
     <string name="input_file_name">Datei</string>
+    <string name="input_socket_name">Socket</string>
+    <string name="file_selector_title">Eingabedatei auswählen</string>
     <string name="file_error_message">Datei konnte nicht gelesen werden</string>
+    <string name="socket_error_message">Verbindung konnte nicht hergestellt werden</string>
     <string name="number_error_message">Ungültige Eingabezahl</string>
     <string name="title_activity_display_parameters">Generatorparameter</string>
     <string name="title_dialog_about">Über</string>
     <string name="about_positive">OK</string>
     <string name="version_name">Version</string>
-    <string name="website">Website: http://github.com/asnelt/derandom/</string>
+    <string name="app_description">Sagt Pseudozufallszahlen vorher ausgehend von einer Sequenz beobachteter Zahlen.\n</string>
     <string name="title_activity_settings">Einstellungen</string>
     <string name="pref_prediction_title">Vorhersage</string>
-    <string name="pref_prediction_length_default_value">8</string>
+    <string name="pref_io_title">Eingabe/Ausgabe</string>
+    <string name="pref_auto_detect">Generator automatisch auswählen</string>
+    <string name="pref_auto_detect_summary">Automatisch Generator mit besten Vorhersagen auswählen</string>
+    <string name="pref_prediction_length">Vorhersagelänge</string>
     <string name="pref_history_length">Verlaufslänge</string>
-    <string name="pref_history_length_default_value">2048</string>
-    <string name="pref_parameter_base_default">10</string>
-    <string name="pref_socket_port_default_value">6869</string>
+    <string name="pref_prediction_length_summary_singular">Zahl wird vorhergesagt</string>
+    <string name="pref_prediction_length_summary_plural">Zahlen werden vorhergesagt</string>
+    <string name="pref_colored_past">Alte Vorhersagen einfärben</string>
+    <string name="pref_colored_past_summary">Richtige Vorhersagen in grün und falsche in rot einfärben</string>
+    <string name="pref_history_length_summary_singular">Zahl im Verlauf behalten</string>
+    <string name="pref_history_length_summary_plural">Zahlen im Verlauf behalten</string>
+    <string name="pref_parameter_base">Basis der Parameteranzeige</string>
+    <string-array name="pref_parameter_base_entries">
+        <item>Oktal</item>
+        <item>Dezimal</item>
+        <item>Hexadezimal</item>
+    </string-array>
+    <string name="pref_socket_port">Socket-Port</string>
+    <string name="pref_socket_port_summary">Port für eingehende Verbindungen</string>
+    <string name="server_listening">Warte auf Verbindungen auf Port</string>
+    <string name="client_connected">Client verbunden</string>
+    <string name="client_disconnected">Client getrennt</string>
 
 </resources>

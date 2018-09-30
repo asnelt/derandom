@@ -47,24 +47,22 @@ from __future__ import print_function
 import random
 import socket
 
-HOST = 'localhost' # Host name of Android device
-PORT = 6869 # Default port
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
-fs = s.makefile() # Buffer for readline
-for i in range(0, 700):
+HOST = 'localhost'  # Host of Android device
+PORT = 6869  # Default port
+SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+SOCKET.connect((HOST, PORT))
+BUFFER = SOCKET.makefile()  # Buffer for readline
+for _ in range(0, 700):
     # Sample bits from generator
-    r = random.getrandbits(32)
-    # Conversion to signed 32 bit integer
-    if r & 0x80000000:
-        r = -0x100000000 + r
+    bits = random.getrandbits(32)
     # Send number string
-    s.sendall(str(r) + '\n')
+    message = str(bits) + '\n'
+    SOCKET.sendall(message.encode())
     # Read and print predictions
-    for j in range(0, 9): # 8 predictions and newline
-        l = fs.readline()
-        print(l, end='')
-s.close()
+    for _ in range(0, 9):  # 8 predictions and newline
+        line = BUFFER.readline()
+        print(line, end='')
+SOCKET.close()
 ```
 Start the app on the Android device and set the input spinner from
 *Text field* to *Socket*.  Make sure that the device and the Derandom
@@ -92,7 +90,7 @@ License
 -------
 
 ```text
-Copyright (C) 2015-2017 Arno Onken
+Copyright (C) 2015-2018 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
