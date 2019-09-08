@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2019 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -156,13 +156,11 @@ class MersenneTwister extends RandomNumberGenerator {
         // Initialize internal state
         mState = new AtomicLongArray(stateSize);
         if (wordSize == Long.SIZE) {
-            //noinspection NumericOverflow
             mWordMask = (Long.MAX_VALUE << 1) | 1L;
         } else {
             mWordMask = (1L << wordSize) - 1L;
         }
         if (maskBits == Long.SIZE) {
-            //noinspection NumericOverflow
             mLowerMask = (Long.MAX_VALUE << 1) | 1L;
         } else {
             mLowerMask = (1L << maskBits) - 1L;
@@ -194,7 +192,7 @@ class MersenneTwister extends RandomNumberGenerator {
             System.arraycopy(PARAMETER_NAMES, 0, names, 0, PARAMETER_NAMES.length);
             names[PARAMETER_NAMES.length] = INDEX_NAME;
             for (int i = 0; i < mState.length(); i++) {
-                names[PARAMETER_NAMES.length + 1 + i] = STATE_NAME + " " + Integer.toString(i);
+                names[PARAMETER_NAMES.length + 1 + i] = STATE_NAME + " " + i;
             }
         } catch (OutOfMemoryError e) {
             names = PARAMETER_NAMES;
@@ -670,7 +668,6 @@ class MersenneTwister extends RandomNumberGenerator {
             int currentIndex = 0;
             for (int longIndex = 0; longIndex < equationCoefficients.length; longIndex++) {
                 if (equationCoefficients[longIndex] != 0) {
-                    //noinspection NumericOverflow
                     long shifter = 1L << (Long.SIZE - 1);
                     for (int bitIndex = 0; bitIndex < Long.SIZE; bitIndex++) {
                         if ((equationCoefficients[longIndex] & shifter) != 0) {
@@ -756,7 +753,6 @@ class MersenneTwister extends RandomNumberGenerator {
         private int getFirstCoefficientIndex(long[] equationCoefficients) {
             for (int longIndex = 0; longIndex < equationCoefficients.length; longIndex++) {
                 if (equationCoefficients[longIndex] != 0) {
-                    //noinspection NumericOverflow
                     long shifter = 1L << (Long.SIZE - 1);
                     for (int bitIndex = 0; bitIndex < Long.SIZE; bitIndex++) {
                         if ((equationCoefficients[longIndex] & shifter) != 0) {

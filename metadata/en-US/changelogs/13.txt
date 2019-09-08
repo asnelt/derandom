@@ -1,0 +1,2 @@
+Made adjustments for Android 10.
+Updated logo.

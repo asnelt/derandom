@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2019 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 28
-    buildToolsVersion "28.0.3"
+    compileSdkVersion 29
+    buildToolsVersion "29.0.2"
 
     defaultConfig {
         applicationId "org.asnelt.derandom"
         minSdkVersion 15
-        targetSdkVersion 28
+        targetSdkVersion 29
         return void
     }
 
@@ -37,6 +37,7 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.0.0'
+    implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.preference:preference:1.1.0'
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2019 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -362,7 +362,7 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      * @param grantResults the granted results for the corresponding permissions
      */
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[],
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Arno Onken
+ * Copyright (C) 2015-2017, 2019 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,9 +90,6 @@ class NumberSequence {
                         break;
                     case INTEGER:
                         mInternalNumbers[i] = Integer.parseInt(numberStrings[i]);
-                        break;
-                    case LONG:
-                        mInternalNumbers[i] = Long.parseLong(numberStrings[i]);
                         break;
                     case FLOAT:
                         if (isFloatString(numberStrings[i])) {
@@ -344,7 +341,8 @@ class NumberSequence {
         switch (mNumberType) {
             case LONG:
             case UNSIGNED_LONG:
-                mInternalNumbers = setLongWord(index, word, mInternalNumbers, wordSize);
+                long[] previousNumbers = mInternalNumbers;
+                mInternalNumbers = setLongWord(index, word, previousNumbers, wordSize);
                 break;
             default:
                 mInternalNumbers[index] = word;
@@ -360,7 +358,6 @@ class NumberSequence {
         long[] observedBits;
         long wordMask;
         if (wordSize == Long.SIZE) {
-            //noinspection NumericOverflow
             wordMask = (Long.MAX_VALUE << 1) | 1L;
         } else {
             wordMask = (1L << wordSize) - 1L;

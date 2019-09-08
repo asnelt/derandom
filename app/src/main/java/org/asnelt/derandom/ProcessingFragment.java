@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2019 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
 import java.io.BufferedReader;
@@ -205,7 +207,7 @@ public class ProcessingFragment extends Fragment {
      * @param context the context the fragment is associated with
      */
     @Override
-    public void onAttach(Context context) {
+    public void onAttach(@NonNull Context context) {
         super.onAttach(context);
         if (context instanceof MainActivity) {
             mListener = (ProcessingFragmentListener) context;
@@ -224,7 +226,7 @@ public class ProcessingFragment extends Fragment {
     /**
      * Executes a clear task.
      */
-    public void clear() {
+    void clear() {
         mRandomManager.deactivateAll();
         mProcessingEnabled = false;
         mNumberType = NumberSequence.NumberType.RAW;
@@ -1018,8 +1020,7 @@ public class ProcessingFragment extends Fragment {
                     if (mClientSocket == null || mClientSocket.isClosed()) {
                         try {
                             // Display information about the server socket
-                            status = getResources().getString(R.string.server_listening) + " "
-                                    + Integer.toString(mServerPort);
+                            status = getResources().getString(R.string.server_listening) + " " + mServerPort;
                             postStatus(status);
                             mClientSocket = mServerSocket.accept();
                             status = getResources().getString(R.string.client_connected);
