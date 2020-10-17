@@ -167,13 +167,11 @@ abstract class RandomNumberGenerator {
      * Returns the state of the generator.
      * @return the current state
      */
-    @SuppressWarnings("unused")
     protected abstract long[] getState();
 
     /**
      * Sets the state of the generator.
      * @param state the new state
      */
-    @SuppressWarnings("unused")
     protected abstract void setState(long[] state);
 }

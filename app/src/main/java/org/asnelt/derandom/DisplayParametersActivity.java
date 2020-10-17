@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2020 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,6 +76,9 @@ public class DisplayParametersActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         String parameterBase = sharedPreferences.getString(SettingsActivity.KEY_PREF_PARAMETER_BASE,
                 "");
+        if (parameterBase == null) {
+            parameterBase = "10";
+        }
 
         int parametersLength = parameters.length;
         if (parameterNames.length < parametersLength) {

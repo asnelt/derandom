@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2020 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
             BIT_RANGE_STOP_NAME, STATE_NAME
     };
     /** The parameter names as a list. */
-    private static final List PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
+    private static final List<String> PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
     /** Internal state. */
     private volatile long mState;
     /** Index of most significant modulus bit. */
@@ -59,7 +59,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     /** Initial seed of the generator. */
     private final long mInitialSeed;
     /** Bit mask based on bit range. */
-    private volatile long mMask;
+    private final long mMask;
 
     /**
      * Constructor initializing all parameters.
@@ -142,8 +142,8 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
         parameters[PARAMETER_NAMES_LIST.indexOf(MULTIPLIER_NAME)] = mMultiplier;
         parameters[PARAMETER_NAMES_LIST.indexOf(INCREMENT_NAME)] = mIncrement;
         parameters[PARAMETER_NAMES_LIST.indexOf(MODULUS_NAME)] = mModulus;
-        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_START_NAME)] = (long) mBitRangeStart;
-        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_STOP_NAME)] = (long) mBitRangeStop;
+        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_START_NAME)] = mBitRangeStart;
+        parameters[PARAMETER_NAMES_LIST.indexOf(BIT_RANGE_STOP_NAME)] = mBitRangeStop;
         parameters[PARAMETER_NAMES_LIST.indexOf(STATE_NAME)] = mState;
         return parameters;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2019 Arno Onken
+ * Copyright (C) 2015-2020 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ class MersenneTwister extends RandomNumberGenerator {
             TEMPERING_T_NAME, TEMPERING_C_NAME, TEMPERING_L_NAME, INITIALIZATION_MULTIPLIER_NAME
     };
     /** The parameter names as a list. */
-    private static final List PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
+    private static final List<String> PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
     /** Human readable name of index. */
     private static final String INDEX_NAME = "State index";
     /** Current state element index. */
@@ -89,7 +89,7 @@ class MersenneTwister extends RandomNumberGenerator {
     /** Human readable name of state. */
     private static final String STATE_NAME = "State";
     /** Internal state. */
-    private volatile AtomicLongArray mState;
+    private final AtomicLongArray mState;
     /** Initial seed of the generator. */
     private final long mInitialSeed;
     /** Helper mask for selecting the word bits. */
@@ -209,25 +209,25 @@ class MersenneTwister extends RandomNumberGenerator {
         long[] parameters;
         try {
             parameters = new long[PARAMETER_NAMES_LIST.size() + 1 + mState.length()];
-            parameters[PARAMETER_NAMES_LIST.size()] = (long) mIndex;
+            parameters[PARAMETER_NAMES_LIST.size()] = mIndex;
             for (int i = 0; i < mState.length(); i++) {
                 parameters[PARAMETER_NAMES_LIST.size() + 1 + i] = mState.get(i);
             }
         } catch (OutOfMemoryError e) {
             parameters = new long[PARAMETER_NAMES_LIST.size()];
         }
-        parameters[PARAMETER_NAMES_LIST.indexOf(WORD_SIZE_NAME)] = (long) mWordSize;
-        parameters[PARAMETER_NAMES_LIST.indexOf(STATE_SIZE_NAME)] = (long) mState.length();
-        parameters[PARAMETER_NAMES_LIST.indexOf(SHIFT_SIZE_NAME)] = (long) mShiftSize;
-        parameters[PARAMETER_NAMES_LIST.indexOf(MASK_BITS_NAME)] = (long) mMaskBits;
+        parameters[PARAMETER_NAMES_LIST.indexOf(WORD_SIZE_NAME)] = mWordSize;
+        parameters[PARAMETER_NAMES_LIST.indexOf(STATE_SIZE_NAME)] = mState.length();
+        parameters[PARAMETER_NAMES_LIST.indexOf(SHIFT_SIZE_NAME)] = mShiftSize;
+        parameters[PARAMETER_NAMES_LIST.indexOf(MASK_BITS_NAME)] = mMaskBits;
         parameters[PARAMETER_NAMES_LIST.indexOf(TWIST_MASK_NAME)] = mTwistMask;
-        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_U_NAME)] = (long) mTemperingU;
+        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_U_NAME)] = mTemperingU;
         parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_D_NAME)] = mTemperingD;
-        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_S_NAME)] = (long) mTemperingS;
+        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_S_NAME)] = mTemperingS;
         parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_B_NAME)] = mTemperingB;
-        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_T_NAME)] = (long) mTemperingT;
+        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_T_NAME)] = mTemperingT;
         parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_C_NAME)] = mTemperingC;
-        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_L_NAME)] = (long) mTemperingL;
+        parameters[PARAMETER_NAMES_LIST.indexOf(TEMPERING_L_NAME)] = mTemperingL;
         parameters[PARAMETER_NAMES_LIST.indexOf(INITIALIZATION_MULTIPLIER_NAME)] =
                 mInitializationMultiplier;
         return parameters;
@@ -491,19 +491,19 @@ class MersenneTwister extends RandomNumberGenerator {
      */
     private class StateFinder {
         /** This is the binary tempering matrix represented as a long vector. */
-        private long[] mTemperingVector;
+        private final long[] mTemperingVector;
         /** Use non-sparse coefficients of a single equation for coefficient construction. */
-        private long[] mEquationCoefficients;
+        private final long[] mEquationCoefficients;
         /** Sparse representation of equation coefficients of all equations. */
-        private long[][] mCoefficients;
+        private final long[][] mCoefficients;
         /** The right hand sides of all equations, one bit per equation. */
-        private long[] mRightHandSide;
+        private final long[] mRightHandSide;
         /** The total number of equations available so far. */
         private int mNumberOfEquations;
         /** Required number of bits to store a coefficient index. */
         private int mBitsPerIndex;
         /** Store multiple coefficient indices in each long. */
-        private int mIndicesPerLong;
+        private final int mIndicesPerLong;
         /** A bit mask to obtain the first coefficient index in a long. */
         private long mFirstIndexMask;
         /** Number of observed numbers in the number sequence. */
@@ -577,9 +577,7 @@ class MersenneTwister extends RandomNumberGenerator {
             for (int i = 0; i < mWordSize; i++) {
                 if ((bits & shifter1) != 0) {
                     // Reset mEquationCoefficients
-                    for (int j = 0; j < mEquationCoefficients.length; j++) {
-                        mEquationCoefficients[j] = 0L;
-                    }
+                    Arrays.fill(mEquationCoefficients, 0L);
                     // Set coefficients according to mTemperingVector
                     long shifter2 = (1L << (mWordSize - 1));
                     for (int bitIndex = 0; bitIndex < mWordSize; bitIndex++) {

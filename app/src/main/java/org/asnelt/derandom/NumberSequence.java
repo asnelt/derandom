@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017, 2019 Arno Onken
+ * Copyright (C) 2015-2020 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.asnelt.derandom;
 
 import java.math.BigInteger;
+import java.util.Arrays;
 
 /**
  * This class represents a sequence of typed numbers.
@@ -366,23 +367,16 @@ class NumberSequence {
             case INTEGER:
             case UNSIGNED_INTEGER:
                 observedBits = new long[mInternalNumbers.length];
-                for (int i = 0; i < observedBits.length; i++) {
-                    observedBits[i] = wordMask & INTEGER_MASK;
-                }
+                Arrays.fill(observedBits, wordMask & INTEGER_MASK);
                 break;
             case LONG:
             case UNSIGNED_LONG:
                 if (wordSize > Integer.SIZE) {
                     observedBits = new long[mInternalNumbers.length];
-                    for (int i = 0; i < observedBits.length; i++) {
-                        observedBits[i] = wordMask;
-                    }
                 } else {
                     observedBits = new long[mInternalNumbers.length * 2];
-                    for (int i = 0; i < observedBits.length; i++) {
-                        observedBits[i] = wordMask;
-                    }
                 }
+                Arrays.fill(observedBits, wordMask);
                 break;
             case FLOAT:
                 observedBits = new long[mInternalNumbers.length];
@@ -404,9 +398,7 @@ class NumberSequence {
                 break;
             default:
                 observedBits = new long[mInternalNumbers.length];
-                for (int i = 0; i < observedBits.length; i++) {
-                    observedBits[i] = wordMask;
-                }
+                Arrays.fill(observedBits, wordMask);
         }
         return observedBits;
     }

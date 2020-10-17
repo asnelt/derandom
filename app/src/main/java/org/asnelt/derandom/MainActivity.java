@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2019 Arno Onken
+ * Copyright (C) 2015-2020 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -267,28 +267,28 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_refresh:
-                if (mProcessingFragment.getInputSelection() == INDEX_FILE_INPUT) {
-                    selectTextFile();
-                } else {
-                    processInput();
-                }
-                return true;
-            case R.id.action_discard:
-                clearInput();
-                return true;
-            case R.id.action_parameters:
-                openActivityParameters();
-                return true;
-            case R.id.action_settings:
-                openActivitySettings();
-                return true;
-            case R.id.action_about:
-                openDialogAbout();
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+        int id = item.getItemId();
+        if (id == R.id.action_refresh) {
+            if (mProcessingFragment.getInputSelection() == INDEX_FILE_INPUT) {
+                selectTextFile();
+            } else {
+                processInput();
+            }
+            return true;
+        } else if (id == R.id.action_discard) {
+            clearInput();
+            return true;
+        } else if (id == R.id.action_parameters) {
+            openActivityParameters();
+            return true;
+        } else if (id == R.id.action_settings) {
+            openActivitySettings();
+            return true;
+        } else if (id == R.id.action_about) {
+            openDialogAbout();
+            return true;
+        } else {
+            return super.onOptionsItemSelected(item);
         }
     }
 
@@ -609,14 +609,19 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
      * @return the length set in the preference or 1 if the preference string is invalid
      */
     private int getNumberPreference(String key) {
+        final int DEFAULT_LENGTH = 1;
+        int length;
         // Get settings
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         String lengthString = sharedPreferences.getString(key, "");
-        int length;
-        try {
-            length = Integer.parseInt(lengthString);
-        } catch (NumberFormatException e) {
-            length = 1;
+        if (lengthString == null) {
+            length = DEFAULT_LENGTH;
+        } else {
+            try {
+                length = Integer.parseInt(lengthString);
+            } catch (NumberFormatException e) {
+                length = DEFAULT_LENGTH;
+            }
         }
         return length;
     }
