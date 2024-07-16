@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2020 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -289,50 +289,63 @@ class MersenneTwister extends RandomNumberGenerator {
     @Override
     public synchronized NumberSequence findSequence(NumberSequence incomingNumbers,
                                                     HistoryBuffer historyBuffer) {
-        // Make prediction based on current state
-        NumberSequence predicted = peekNextOutputs(incomingNumbers.length(),
-                incomingNumbers.getNumberType());
-
-        // Check whether the current state is compatible with the incoming numbers
-        if (predicted.equals(incomingNumbers)) {
-            return nextOutputs(incomingNumbers.length(), incomingNumbers.getNumberType());
-        }
-
-        int wordSize = getWordSize();
+        final int wordSize = getWordSize();
+        NumberSequence.NumberType numberType = incomingNumbers.getNumberType();
         long[] incomingWords = incomingNumbers.getSequenceWords(wordSize);
-        if (incomingNumbers.hasTruncatedOutput()) {
-            try {
-                if (mStateFinder == null) {
-                    mStateFinder = new StateFinder();
-                }
-                boolean solved = false;
-                long[] observedWordBits = incomingNumbers.getObservedWordBits(wordSize);
-                for (int i = 0; i < incomingWords.length; i++) {
-                    mStateFinder.addInput(incomingWords[i], observedWordBits[i]);
-                    solved = mStateFinder.isSolved();
-                    if (solved) {
-                        // Advance state according to remaining numbers
-                        next(incomingWords.length - i - 1);
-                        mStateFinder = null;
-                        break;
-                    }
-                }
-                if (!solved) {
-                    return nextOutputs(incomingNumbers.length(), incomingNumbers.getNumberType());
-                }
-            } catch (OutOfMemoryError e) {
-                mStateFinder = null;
-                setActive(false);
+        long[] observedWordBits = incomingNumbers.getObservedWordBits(wordSize);
+        final int wordsPerInternal = NumberSequence.getRequiredWordsPerNumber(numberType, wordSize);
+        NumberSequence predicted = new NumberSequence(numberType);
+
+        for (int i = 0; i < incomingNumbers.length(); i++) {
+            long nextInternal = incomingNumbers.getInternalNumber(i);
+            NumberSequence nextPredicted = peekNextOutputs(1, numberType);
+            predicted.concatenate(nextPredicted);
+            if (nextPredicted.getInternalNumber(0) == nextInternal) {
+                // Advance state and continue with next incoming number
+                next(wordsPerInternal);
+                continue;
             }
-        } else {
-            // No hidden output, so tempering can just be reversed
-            for (long word : incomingWords) {
-                if (mIndex >= mState.length()) {
-                    twistState(mState.length());
-                    mIndex = 0;
+            int wordIndex = wordsPerInternal * i;
+            if (incomingNumbers.hasTruncatedOutput()) {
+                try {
+                    if (mStateFinder == null) {
+                        mStateFinder = new StateFinder();
+                    }
+                    boolean solved = false;
+                    for (int j = 0; j < wordsPerInternal; j++) {
+                        mStateFinder.addInput(incomingWords[wordIndex + j],
+                                observedWordBits[wordIndex + j]);
+                        solved = mStateFinder.isSolved();
+                        if (solved) {
+                            // Advance state according to remaining numbers
+                            next(wordsPerInternal - j - 1);
+                            mStateFinder = null;
+                            break;
+                        }
+                    }
+                    if (!solved) {
+                        next(wordsPerInternal);
+                    }
+                } catch (OutOfMemoryError e) {
+                    mStateFinder = null;
+                    setActive(false);
+                    // Just replicate last number to fill up prediction
+                    for (int j = i + 1; j < incomingNumbers.length(); j++) {
+                        predicted.concatenate(nextPredicted);
+                    }
+                    break;
                 }
-                mState.set(mIndex, reverseTemper(word & mWordMask));
-                mIndex++;
+            } else {
+                // No hidden output, so tempering can just be reversed
+                for (int j = 0; j < wordsPerInternal; j++) {
+                    long word = incomingWords[wordIndex + j];
+                    if (mIndex >= mState.length()) {
+                        twistState(mState.length());
+                        mIndex = 0;
+                    }
+                    mState.set(mIndex, reverseTemper(word & mWordMask));
+                    mIndex++;
+                }
             }
         }
         return predicted;
@@ -358,45 +371,6 @@ class MersenneTwister extends RandomNumberGenerator {
     @Override
     protected int getWordSize() {
         return mWordSize;
-    }
-
-    /**
-     * Returns the state of the generator.
-     * @return the current state
-     */
-    @Override
-    protected long[] getState() {
-        long[] stateCopy;
-        try {
-            stateCopy = new long[mState.length() + 1];
-            for (int i = 0; i < mState.length(); i++) {
-                stateCopy[i] = mState.get(i);
-            }
-            stateCopy[stateCopy.length - 1] = mIndex;
-        } catch (OutOfMemoryError e) {
-            setActive(false);
-            stateCopy = null;
-        }
-        return stateCopy;
-    }
-
-    /**
-     * Sets the state of the generator.
-     * @param newState the new state
-     * @throws IllegalArgumentException if state does not have enough elements
-     */
-    @Override
-    protected synchronized void setState(long[] newState) {
-        if (newState == null || newState.length < mState.length() + 1) {
-            throw new IllegalArgumentException();
-        }
-        for (int i = 0; i < mState.length(); i++) {
-            mState.set(i, newState[i]);
-        }
-        mIndex = (int) newState[newState.length - 1];
-        if (mIndex < 0 || mIndex > mState.length()) {
-            throw new IllegalArgumentException();
-        }
     }
 
     /**
@@ -669,7 +643,7 @@ class MersenneTwister extends RandomNumberGenerator {
                     long shifter = 1L << (Long.SIZE - 1);
                     for (int bitIndex = 0; bitIndex < Long.SIZE; bitIndex++) {
                         if ((equationCoefficients[longIndex] & shifter) != 0) {
-                            long index = (longIndex * Long.SIZE) + bitIndex;
+                            long index = ((long) longIndex * Long.SIZE) + bitIndex;
                             int subIndex = currentIndex % mIndicesPerLong;
                             sparseCoefficients[currentIndex / mIndicesPerLong]
                                     |= (index << (subIndex * mBitsPerIndex));

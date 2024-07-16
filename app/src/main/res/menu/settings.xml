@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015, 2016 Arno Onken
+Copyright (C) 2015-2024 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <menu xmlns:tools="http://schemas.android.com/tools"
-    tools:context="org.asnelt.derandom.SettingsActivity" >
-
-</menu>
+    tools:context="org.asnelt.derandom.SettingsActivity"/>

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2020 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
     repositories {
-        jcenter()
+        mavenCentral()
         maven {
             url 'https://maven.google.com/'
             name 'Google'
@@ -24,13 +24,13 @@ buildscript {
         google()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.0'
+        classpath 'com.android.tools.build:gradle:8.5.1'
     }
 }
 
 allprojects {
     repositories {
-        jcenter()
+        mavenCentral()
         maven {
             url 'https://maven.google.com/'
             name 'Google'

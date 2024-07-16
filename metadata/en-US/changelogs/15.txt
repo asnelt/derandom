@@ -1,0 +1,4 @@
+Made adjustments for Android 15.
+Improved number history scrolling.
+Improved reliability of double numbers processing.
+Updated logo.

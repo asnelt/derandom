@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2020 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import java.util.Arrays;
 /**
  * This class represents a sequence of typed numbers.
  */
-class NumberSequence {
+public class NumberSequence {
     /** Bit mask for an integer. */
     private static final long INTEGER_MASK = (1L << Integer.SIZE) - 1L;
     /** Two complement bit extension for negative integers. */
@@ -272,7 +272,7 @@ class NumberSequence {
      * @throws IndexOutOfBoundsException if index is not a valid index of the sequence
      */
     String toString(int index) throws IndexOutOfBoundsException {
-        if (mInternalNumbers == null || index < 0 || index > mInternalNumbers.length) {
+        if (mInternalNumbers == null || index < 0 || index >= mInternalNumbers.length) {
             throw new IndexOutOfBoundsException();
         }
         String numberString;
@@ -381,19 +381,25 @@ class NumberSequence {
             case FLOAT:
                 observedBits = new long[mInternalNumbers.length];
                 long floatMask = ((1L << FLOAT_RANDOM_BITS) - 1L) << (wordSize - FLOAT_RANDOM_BITS);
-                for (int i = 0; i < mInternalNumbers.length; i++) {
-                    observedBits[i] = floatMask;
-                }
+                Arrays.fill(observedBits, floatMask);
                 break;
             case DOUBLE:
-                observedBits = new long[mInternalNumbers.length * 2];
-                long doubleLowerMask = ((1L << DOUBLE_LOWER_RANDOM_BITS) - 1L)
-                        << (wordSize - DOUBLE_LOWER_RANDOM_BITS);
-                long doubleUpperMask = ((1L << DOUBLE_UPPER_RANDOM_BITS) - 1L)
-                        << (wordSize - DOUBLE_UPPER_RANDOM_BITS);
-                for (int i = 0; i < mInternalNumbers.length; i++) {
-                    observedBits[2 * i] = doubleUpperMask;
-                    observedBits[2 * i + 1] = doubleLowerMask;
+                if (wordSize > Float.SIZE) {
+                    observedBits = new long[mInternalNumbers.length];
+                    long doubleMask = ((1L << (DOUBLE_LOWER_RANDOM_BITS + DOUBLE_UPPER_RANDOM_BITS))
+                            - 1L)
+                            << (wordSize - (DOUBLE_LOWER_RANDOM_BITS + DOUBLE_UPPER_RANDOM_BITS));
+                    Arrays.fill(observedBits, doubleMask);
+                } else {
+                    observedBits = new long[mInternalNumbers.length * 2];
+                    long doubleLowerMask = ((1L << DOUBLE_LOWER_RANDOM_BITS) - 1L)
+                            << (wordSize - DOUBLE_LOWER_RANDOM_BITS);
+                    long doubleUpperMask = ((1L << DOUBLE_UPPER_RANDOM_BITS) - 1L)
+                            << (wordSize - DOUBLE_UPPER_RANDOM_BITS);
+                    for (int i = 0; i < mInternalNumbers.length; i++) {
+                        observedBits[2 * i] = doubleUpperMask;
+                        observedBits[2 * i + 1] = doubleLowerMask;
+                    }
                 }
                 break;
             default:
@@ -405,14 +411,24 @@ class NumberSequence {
 
     /**
      * Returns the number of words required for each number of the sequence.
+     * @param wordSize the number of bits to represent in a long
      * @return the number of words required for a number of the sequence
      */
-    static int getRequiredWordsPerNumber(NumberType numberType) {
+    static int getRequiredWordsPerNumber(NumberType numberType, int wordSize) {
         switch (numberType) {
             case LONG:
             case UNSIGNED_LONG:
+                if (wordSize > Integer.SIZE) {
+                    return 1;
+                } else {
+                    return 2;
+                }
             case DOUBLE:
-                return 2;
+                if (wordSize > Float.SIZE) {
+                    return 1;
+                } else {
+                    return 2;
+                }
             default:
                 return 1;
         }

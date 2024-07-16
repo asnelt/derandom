@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -179,7 +179,7 @@ class HistoryBuffer {
      */
     private void grow(int size) {
         int growLength = mNumbers.length;
-        if (growLength <= 0) {
+        if (growLength == 0) {
             growLength = 1;
         }
         // Double growLength until we can fit size additional elements

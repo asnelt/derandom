@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015-2017 Arno Onken
+Copyright (C) 2015-2024 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,25 +26,25 @@ limitations under the License.
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/app_description"
-        android:id="@+id/text_app_description" />
+        android:id="@+id/text_app_description"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/version_name"
-        android:id="@+id/text_version" />
+        android:id="@+id/text_version"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/copyright"
-        android:id="@+id/text_copyright" />
+        android:id="@+id/text_copyright"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/website"
         android:autoLink="web"
-        android:id="@+id/text_website" />
+        android:id="@+id/text_website"/>
 
 </LinearLayout>

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2020 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,10 @@ package org.asnelt.derandom;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.preference.PreferenceManager;
 import androidx.appcompat.app.AppCompatActivity;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -44,6 +47,8 @@ public class DisplayParametersActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_display_parameters);
+
         LayoutInflater inflater = getLayoutInflater();
         ViewGroup rootView = (ViewGroup) getWindow().getDecorView().getRootView();
         View view = inflater.inflate(R.layout.activity_display_parameters, rootView, false);
@@ -76,9 +81,6 @@ public class DisplayParametersActivity extends AppCompatActivity {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         String parameterBase = sharedPreferences.getString(SettingsActivity.KEY_PREF_PARAMETER_BASE,
                 "");
-        if (parameterBase == null) {
-            parameterBase = "10";
-        }
 
         int parametersLength = parameters.length;
         if (parameterNames.length < parametersLength) {
@@ -121,6 +123,13 @@ public class DisplayParametersActivity extends AppCompatActivity {
         }
         scrollViewParameters.addView(layoutParameters);
         setContentView(view);
+
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
     }
 
     /**

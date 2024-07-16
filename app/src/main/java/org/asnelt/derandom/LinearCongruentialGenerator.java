@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2020 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -245,30 +245,6 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     }
 
     /**
-     * Returns the state of the generator.
-     * @return the current state
-     */
-    @Override
-    protected long[] getState() {
-        long[] state = new long[1];
-        state[0] = mState;
-        return state;
-    }
-
-    /**
-     * Sets the state of the generator.
-     * @param state the new state
-     * @throws IllegalArgumentException if state is empty
-     */
-    @Override
-    protected synchronized void setState(long[] state) {
-        if (state == null || state.length < 1) {
-            throw new IllegalArgumentException();
-        }
-        mState = state[0];
-    }
-
-    /**
      * Calculates the state of the generator based on two consecutive values.
      * @param number one output of the generator
      * @param successor next output of the generator
@@ -283,9 +259,9 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
             leadingBits = 0;
         }
         // Try all possible states
-        for (long j = 0; j < (1 << leadingBits); j++) {
+        for (long j = 0; j < (1L << leadingBits); j++) {
             long leadingState = (j << (mBitRangeStop + 1)) | number;
-            for (long i = 0; i < (1 << mBitRangeStart); i++) {
+            for (long i = 0; i < (1L << mBitRangeStart); i++) {
                 long state = leadingState | i;
                 state = nextState(state);
                 if (calculateOutput(state) == successor) {

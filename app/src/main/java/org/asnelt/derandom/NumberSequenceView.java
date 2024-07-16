@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,19 +60,22 @@ public class NumberSequenceView extends AppCompatTextView {
     }
 
     /**
-     * Appends a number sequence to the view.
-     * @param numberSequence the number sequence to append to the view
+     * Sets a number sequence to be displayed.
+     * @param numberSequence the number sequence to be displayed
      */
-    public void append(NumberSequence numberSequence) {
+    public void setNumbers(NumberSequence numberSequence) {
         if (numberSequence == null) {
+            clear();
             return;
         }
+        StringBuilder numberText = new StringBuilder();
         // Append numbers
         for (int i = 0; i < numberSequence.length(); i++) {
             if (i > 0) {
-                append("\n");
+                numberText.append("\n");
             }
-            append(numberSequence.toString(i));
+            numberText.append(numberSequence.toString(i));
         }
+        setText(numberText.toString());
     }
 }

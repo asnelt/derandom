@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2019 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,17 @@
 
 package org.asnelt.derandom;
 
-import android.app.Activity;
-import android.content.Context;
 import android.net.Uri;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Pair;
 
-import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.ViewModel;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -43,82 +41,15 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * This class implements a fragment for doing generator related processing. The fragment is retained
- * across configuration changes.
- */
-public class ProcessingFragment extends Fragment {
-    /**
-     * Interface for listening to processing changes.
-     */
-    interface ProcessingFragmentListener {
-        /**
-         * Called when the history prediction was completely replaced.
-         * @param historyNumbers previously entered numbers
-         * @param historyPredictionNumbers predictions for previous numbers
-         */
-        void onHistoryPredictionReplaced(NumberSequence historyNumbers,
-                                         NumberSequence historyPredictionNumbers);
-
-        /**
-         * Called when the random number generator selection changed.
-         * @param generatorIndex index of new generator
-         */
-        void onGeneratorChanged(int generatorIndex);
-
-        /**
-         * Called when the input history changed.
-         * @param inputNumbers the entered numbers
-         * @param predictionNumbers predictions for entered numbers
-         */
-        void onHistoryChanged(NumberSequence inputNumbers, NumberSequence predictionNumbers);
-
-        /**
-         * Called when the predictions for upcoming numbers changed.
-         * @param predictionNumbers predictions of upcoming numbers
-         */
-        void onPredictionChanged(NumberSequence predictionNumbers);
-
-        /**
-         * Called when setting the input method to an input file is aborted and sets the input
-         * method back to direct input.
-         */
-        void onFileInputAborted();
-
-        /**
-         * Called when setting the input method to an input socket is aborted and sets the input
-         * method back to direct input.
-         */
-        void onSocketInputAborted();
-
-        /**
-         * Called when invalid numbers where entered.
-         */
-        void onInvalidInputNumber();
-
-        /**
-         * Called when the input was cleared.
-         */
-        void onClear();
-
-        /**
-         * Called when the progress status changed.
-         */
-        void onProgressUpdate();
-
-        /**
-         * Called when the status of the network socket changed.
-         * @param newStatus a description of the new status
-         */
-        void onSocketStatusChanged(String newStatus);
-    }
-
+public class ProcessingViewModel extends ViewModel {
     /** Random manager for generating predictions. */
     private final RandomManager mRandomManager;
-    /** Handler for updating the user interface. */
+    /** Handler for starting socket input processing. */
     private final Handler mHandler;
     /** Circular buffer for storing input numbers. */
     private final HistoryBuffer mHistoryBuffer;
+    /** Circular buffer for storing predicted numbers. */
+    private final HistoryBuffer mHistoryPredictionBuffer;
     /** Object for synchronizing the main thread and the processing thread. */
     private final Object mSynchronizationObject;
     /** Executor service for all processing tasks. */
@@ -133,14 +64,12 @@ public class ProcessingFragment extends Fragment {
     private volatile int mPredictionLength;
     /** Flag for whether the generator should be detected automatically. */
     private volatile boolean mAutoDetect;
-    /** Current input file for reading numbers. */
+    /** Current input file stream for reading numbers. */
     private volatile Uri mInputUri;
     /** Reader for reading input numbers. */
     private volatile BufferedReader mInputReader;
     /** Writer for writing predictions to the client socket. */
     private volatile BufferedWriter mOutputWriter;
-    /** Flag for whether a user interface update was missed during a configuration change. */
-    private volatile boolean mMissingUpdate;
     /** Number of process input tasks. */
     private volatile int mInputTaskLength;
     /** Flag for whether processing should continue. */
@@ -153,26 +82,110 @@ public class ProcessingFragment extends Fragment {
     private volatile Socket mClientSocket;
     /** Current number type. */
     private volatile NumberSequence.NumberType mNumberType;
-    /** Listener for processing changes. */
-    private ProcessingFragmentListener mListener;
     /** Future for cancelling the server task. */
     private Future<?> mServerFuture;
-    /** Index of selected input method. */
-    private int mInputSelection;
 
     /**
-     * Constructor for initializing the processing fragment. Generates a HistoryBuffer, a
-     * RandomManager and an ExecutorService.
+     * Enumeration of all possible input types.
+     * */
+    enum InputType {
+        DIRECT_INPUT(0), FILE_INPUT(1), SOCKET_INPUT(2);
+
+        /** Index associated with input type for use in Spinner. */
+        private final int mIndex;
+
+        /**
+         * Initializes the input type.
+         * @param index the index of the input type for use in a Spinner
+         */
+        InputType(int index) {
+            mIndex = index;
+        }
+
+        /**
+         * Returns the index of the input type for use in a Spinner.
+         * @return the index of the input type
+         */
+        public int getIndex() {
+            return mIndex;
+        }
+    }
+
+    /**
+     * Enumeration of all possible status types.
+     * */
+    public enum StatusType {
+        DIRECT_INPUT, FILE_INPUT, SERVER_LISTENING, CLIENT_CONNECTED, CLIENT_DISCONNECTED
+    }
+
+    /**
+     * Enumeration of all possible notification types.
+     * */
+    enum NotificationType {
+        FILE_INPUT_ABORTED, SOCKET_INPUT_ABORTED, INVALID_INPUT_NUMBER
+    }
+
+    /**
+     * Event class with a notification that can be consumed.
      */
-    public ProcessingFragment() {
+    static class NotificationEvent {
+        /** Type of the notification. */
+        private final NotificationType mType;
+        /** Flag for whether the event was consumed. */
+        private boolean mHasBeenHandled;
+
+        /**
+         * Initializes the event, setting the internal flag to not consumed.
+         * @param type the type of the notification event
+         */
+        public NotificationEvent(NotificationType type) {
+            mHasBeenHandled = false;
+            mType = type;
+        }
+
+        /**
+         * Gets the type of the event if not already consumed, otherwise null.
+         * @return the type of the event or null
+         */
+        public NotificationType getTypeIfNotHandled() {
+            if (mHasBeenHandled) {
+                return null;
+            } else {
+                mHasBeenHandled = true;
+                return mType;
+            }
+        }
+    }
+
+    /** Current input method. */
+    private InputType mInputType;
+    /** Current input method to display. */
+    private MutableLiveData<InputType> mLiveInputType;
+    /** Current history numbers and history prediction numbers to display. */
+    private MutableLiveData<Pair<NumberSequence,NumberSequence>> mLiveHistoryNumbers;
+    /** Current prediction numbers to display. */
+    private MutableLiveData<NumberSequence> mLivePredictionNumbers;
+    /** Current generator selection to display. */
+    private MutableLiveData<Integer> mLiveGenerator;
+    /** Current status to display. */
+    private MutableLiveData<Pair<StatusType,Integer>> mLiveStatus;
+    /** Current processing indicator. */
+    private MutableLiveData<Boolean> mLiveIsProcessing;
+    /** Current notification event. */
+    private MutableLiveData<NotificationEvent> mLiveNotification;
+
+    /**
+     * Constructor for initializing the ProcessingViewModel. Generates a HistoryBuffer, a
+     * HistoryPredictionBuffer, a RandomManager and an ExecutorService.
+     */
+    public ProcessingViewModel() {
         super();
         mPredictionLength = 0;
         mAutoDetect = false;
         mInputUri = null;
         mInputReader = null;
         mOutputWriter = null;
-        mMissingUpdate = false;
-        mInputSelection = 0;
+        mInputType = InputType.DIRECT_INPUT;
         mNumberType = NumberSequence.NumberType.RAW;
         mInputTaskLength = 0;
         mProcessingEnabled = true;
@@ -180,8 +193,9 @@ public class ProcessingFragment extends Fragment {
         mClientSocket = null;
         mSynchronizationObject = this;
         mHistoryBuffer = new HistoryBuffer(0);
+        mHistoryPredictionBuffer = new HistoryBuffer(0);
         mRandomManager = new RandomManager();
-        // Handler for processing user interface updates
+        // Handler for starting socket input processing
         mHandler = new Handler(Looper.getMainLooper());
         mProcessingExecutor = Executors.newSingleThreadExecutor();
         mServerExecutor = Executors.newSingleThreadExecutor();
@@ -191,36 +205,96 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
-     * Initializes this activity. Called only once since the fragment is retained across
-     * configuration changes.
-     * @param savedInstanceState Bundle with saved state
+     * Called when the view is cleared.
      */
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        // Retain fragment across configuration changes
-        setRetainInstance(true);
+    public void onCleared() {
+        mProcessingEnabled = false;
+        // Shutdown server thread
+        mServerExecutor.shutdownNow();
+        // Shutdown processing thread
+        mProcessingExecutor.shutdownNow();
+        // Close all sockets
+        closeSockets();
+        super.onCleared();
     }
 
     /**
-     * Called when the fragment is associated with an activity.
-     * @param context the context the fragment is associated with
+     * Returns the object indicating the current input type to be displayed.
+     * @return the object indicating the current input type
      */
-    @Override
-    public void onAttach(@NonNull Context context) {
-        super.onAttach(context);
-        if (context instanceof MainActivity) {
-            mListener = (ProcessingFragmentListener) context;
+    LiveData<InputType> getLiveInputType() {
+        if (mLiveInputType == null) {
+            mLiveInputType = new MutableLiveData<>();
         }
+        return mLiveInputType;
     }
 
     /**
-     * Called before the fragment is no longer associated with an activity.
+     * Returns the object holding the current history numbers and history prediction numbers to be
+     * displayed.
+     * @return the object holding the current history and history prediction numbers
      */
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        mListener = null;
+    LiveData<Pair<NumberSequence,NumberSequence>> getLiveHistoryNumbers() {
+        if (mLiveHistoryNumbers == null) {
+            mLiveHistoryNumbers = new MutableLiveData<>();
+        }
+        return mLiveHistoryNumbers;
+    }
+
+    /**
+     * Returns the object holding the current prediction numbers to be displayed.
+     * @return the object holding the current prediction numbers
+     */
+    LiveData<NumberSequence> getLivePredictionNumbers() {
+        if (mLivePredictionNumbers == null) {
+            mLivePredictionNumbers = new MutableLiveData<>();
+        }
+        return mLivePredictionNumbers;
+    }
+
+    /**
+     * Returns the object holding the current generator selection to be displayed.
+     * @return the object holding the current generator selection
+     */
+    LiveData<Integer> getLiveGenerator() {
+        if (mLiveGenerator == null) {
+            mLiveGenerator = new MutableLiveData<>();
+        }
+        return mLiveGenerator;
+    }
+
+    /**
+     * Returns the object holding the current status to be displayed.
+     * @return the object holding the current status
+     */
+    LiveData<Pair<StatusType,Integer>> getLiveStatus() {
+        if (mLiveStatus == null) {
+            mLiveStatus = new MutableLiveData<>();
+        }
+        return mLiveStatus;
+    }
+
+    /**
+     * Returns the object indicating whether processing is ongoing.
+     * @return the object indicating ongoing processing
+     */
+    LiveData<Boolean> getLiveIsProcessing() {
+        if (mLiveIsProcessing == null) {
+            mLiveIsProcessing = new MutableLiveData<>();
+        }
+        return mLiveIsProcessing;
+    }
+
+    /**
+     * Returns the object for signalling notifications to the main activity.
+     * @return the object for signalling notifications
+     */
+    LiveData<NotificationEvent> getLiveNotification() {
+        if (mLiveNotification == null) {
+            mLiveNotification = new MutableLiveData<>();
+        }
+        return mLiveNotification;
     }
 
     /**
@@ -230,17 +304,17 @@ public class ProcessingFragment extends Fragment {
         mRandomManager.deactivateAll();
         mProcessingEnabled = false;
         mNumberType = NumberSequence.NumberType.RAW;
-        mProcessingExecutor.execute(new ClearTask());
+        mProcessingExecutor.execute(new ProcessingViewModel.ClearTask());
     }
 
     /**
      * Sets the currently active generator.
-     * @param index index of the currently active generator
+     * @param generatorIndex index of the desired generator
      */
-    void setCurrentGenerator(int index) {
-        if (index != mRandomManager.getCurrentGeneratorIndex()) {
+    void setCurrentGenerator(int generatorIndex) {
+        if (generatorIndex != mRandomManager.getCurrentGeneratorIndex()) {
             prepareInputProcessing();
-            mProcessingExecutor.execute(new UpdateAllTask(index));
+            mProcessingExecutor.execute(new ProcessingViewModel.UpdateAllTask(generatorIndex));
         }
     }
 
@@ -277,19 +351,28 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
-     * Sets the current input selection index.
-     * @param inputSelection the new input selection index
+     * Sets the current input type.
+     * @param inputType the new input type
      */
-    void setInputSelection(int inputSelection) {
-        mInputSelection = inputSelection;
+    void setInputType(InputType inputType) {
+        if (inputType == mInputType) {
+            return;
+        }
+        mInputType = inputType;
+        if (mLiveInputType != null) {
+            mLiveInputType.postValue(inputType);
+        }
+        if (mInputType == InputType.DIRECT_INPUT) {
+            postStatus(StatusType.DIRECT_INPUT);
+        }
     }
 
     /**
-     * Returns the current input selection index.
-     * @return the current input selection index
+     * Returns the current input type.
+     * @return the current input type
      */
-    int getInputSelection() {
-        return mInputSelection;
+    InputType getInputType() {
+        return mInputType;
     }
 
     /**
@@ -319,7 +402,7 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
-     * Sets the flag that determines whether the generator is detected automatically..
+     * Sets the flag that determines whether the generator is detected automatically.
      * @param autoDetect automatically detect generator if true
      */
     void setAutoDetect(boolean autoDetect) {
@@ -349,27 +432,11 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
-     * Determines whether a user interface update was missed during a configuration change.
-     * @return true if an update was missed
-     */
-    boolean isMissingUpdate() {
-        return mMissingUpdate;
-    }
-
-    /**
      * Executes a change capacity task.
      * @param capacity the new input history capacity
      */
     void setCapacity(int capacity) {
-        mProcessingExecutor.execute(new ChangeCapacityTask(capacity));
-    }
-
-    /**
-     * Executes an update task.
-     */
-    void updateAll() {
-        prepareInputProcessing();
-        mProcessingExecutor.execute(new UpdateAllTask());
+        mProcessingExecutor.execute(new ProcessingViewModel.ChangeCapacityTask(capacity));
     }
 
     /**
@@ -379,24 +446,25 @@ public class ProcessingFragment extends Fragment {
     void processInputString(String input) {
         // Process input in separate thread
         prepareInputProcessing();
-        mProcessingExecutor.execute(new ProcessInputTask(input));
+        mProcessingExecutor.execute(new ProcessingViewModel.ProcessInputTask(input));
     }
 
     /**
      * Opens and processes the input file pointed to by fileUri. Disables direct input.
      * @param fileUri the URI of the file to be processed
+     * @param fileStream the file stream of the input file to be processed
      */
-    void processInputFile(Uri fileUri) {
+    void processInputFile(Uri fileUri, InputStream fileStream) {
         // Process input in separate thread
         prepareInputProcessing();
-        mProcessingExecutor.execute(new ProcessInputTask(fileUri));
+        mProcessingExecutor.execute(new ProcessingViewModel.ProcessInputTask(fileUri, fileStream));
     }
 
     /**
      * Starts the server task and sets the server future.
      */
     void startServerTask() {
-        mServerFuture = mServerExecutor.submit(new ServerTask());
+        mServerFuture = mServerExecutor.submit(new ProcessingViewModel.ServerTask());
     }
 
     /**
@@ -411,12 +479,22 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
+     * Posts the current status to the user interface thread.
+     * @param status the new status
+     */
+    private void postStatus(final StatusType status) {
+        if (mLiveStatus != null) {
+            mLiveStatus.postValue(Pair.create(status, mServerPort));
+        }
+    }
+
+    /**
      * Executes a process input task with an input reader.
      */
     private void processInputSocket() {
         // Process input in separate thread
         prepareInputProcessing();
-        mProcessingExecutor.execute(new ProcessInputTask());
+        mProcessingExecutor.execute(new ProcessingViewModel.ProcessInputTask());
     }
 
     /**
@@ -467,21 +545,6 @@ public class ProcessingFragment extends Fragment {
     }
 
     /**
-     * Called when the activity is destroyed.
-     */
-    @Override
-    public void onDestroy() {
-        mProcessingEnabled = false;
-        // Shutdown server thread
-        mServerExecutor.shutdownNow();
-        // Shutdown processing thread
-        mProcessingExecutor.shutdownNow();
-        // Close all sockets
-        closeSockets();
-        super.onDestroy();
-    }
-
-    /**
      * Prepares input processing by incrementing the counter of active input tasks and updating the
      * progressing status.
      */
@@ -489,8 +552,8 @@ public class ProcessingFragment extends Fragment {
         synchronized (mSynchronizationObject) {
             mInputTaskLength++;
         }
-        if (mListener != null) {
-            mListener.onProgressUpdate();
+        if (mLiveIsProcessing != null) {
+            mLiveIsProcessing.postValue(isProcessingInput());
         }
     }
 
@@ -503,13 +566,16 @@ public class ProcessingFragment extends Fragment {
                 mInputTaskLength--;
             }
         }
+        if (mLiveIsProcessing != null) {
+            mLiveIsProcessing.postValue(isProcessingInput());
+        }
     }
 
     /**
-     * Calculates a new prediction and notifies the mListener.
+     * Calculates a new prediction and notifies the main activity.
      */
     private void updatePrediction() {
-        mProcessingExecutor.execute(new UpdatePredictionTask());
+        mProcessingExecutor.execute(new ProcessingViewModel.UpdatePredictionTask());
     }
 
     /**
@@ -522,24 +588,17 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             mHistoryBuffer.clear();
+            mHistoryPredictionBuffer.clear();
             int currentGeneratorIndex = mRandomManager.getCurrentGeneratorIndex();
             mRandomManager.reset();
             mRandomManager.setCurrentGeneratorIndex(currentGeneratorIndex);
-            boolean posted = mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (mListener != null) {
-                        mListener.onClear();
-                        mMissingUpdate = false;
-                    } else {
-                        mMissingUpdate = true;
-                    }
-                }
-            });
-            if (!posted) {
-                mMissingUpdate = true;
-            }
             mProcessingEnabled = true;
+            if (mLiveHistoryNumbers != null) {
+                mLiveHistoryNumbers.postValue(Pair.create(null, null));
+            }
+            if (mLivePredictionNumbers != null) {
+                mLivePredictionNumbers.postValue(null);
+            }
         }
     }
 
@@ -563,6 +622,7 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             mHistoryBuffer.setCapacity(mCapacity);
+            mHistoryPredictionBuffer.setCapacity(mCapacity);
         }
     }
 
@@ -572,16 +632,6 @@ public class ProcessingFragment extends Fragment {
     private class UpdateAllTask implements Runnable {
         /** The index of the new generator. */
         private final int mGeneratorIndex;
-        /** Flag that determines whether the generator should be changed. */
-        private final boolean mChangeGenerator;
-
-        /**
-         * Standard constructor that initializes a task that does not change the generator.
-         */
-        UpdateAllTask() {
-            mGeneratorIndex = 0;
-            mChangeGenerator = false;
-        }
 
         /**
          * Constructor that initializes a task that changes the generator.
@@ -589,7 +639,6 @@ public class ProcessingFragment extends Fragment {
          */
         UpdateAllTask(final int generatorIndex) {
             mGeneratorIndex = generatorIndex;
-            mChangeGenerator = true;
         }
 
         /**
@@ -598,7 +647,7 @@ public class ProcessingFragment extends Fragment {
         @Override
         public void run() {
             final boolean generatorChanged;
-            if (mChangeGenerator && mRandomManager.getCurrentGeneratorIndex() != mGeneratorIndex) {
+            if (mRandomManager.getCurrentGeneratorIndex() != mGeneratorIndex) {
                 // Process complete history
                 mRandomManager.setCurrentGeneratorIndex(mGeneratorIndex);
                 generatorChanged = true;
@@ -608,7 +657,7 @@ public class ProcessingFragment extends Fragment {
             final NumberSequence historyNumbers;
             final NumberSequence historyPredictionNumbers;
             final NumberSequence predictionNumbers;
-            if ((generatorChanged || !mChangeGenerator) && mHistoryBuffer.length() > 0) {
+            if (generatorChanged && mHistoryBuffer.length() > 0) {
                 mRandomManager.resetCurrentGenerator();
                 historyNumbers = new NumberSequence(mHistoryBuffer.toArray(), mNumberType);
                 mRandomManager.findCurrentSequence(historyNumbers, null);
@@ -621,24 +670,18 @@ public class ProcessingFragment extends Fragment {
                 predictionNumbers = null;
             }
             finishInputProcessing();
-            boolean posted = mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (generatorChanged || !mChangeGenerator) {
-                        if (mListener != null) {
-                            mListener.onProgressUpdate();
-                            mListener.onHistoryPredictionReplaced(historyNumbers,
-                                    historyPredictionNumbers);
-                            mListener.onPredictionChanged(predictionNumbers);
-                            mMissingUpdate = false;
-                        } else {
-                            mMissingUpdate = true;
-                        }
-                    }
+            if (generatorChanged) {
+                mHistoryPredictionBuffer.clear();
+                if (historyPredictionNumbers != null){
+                    mHistoryPredictionBuffer.put(historyPredictionNumbers.getInternalNumbers());
                 }
-            });
-            if (!posted) {
-                mMissingUpdate = true;
+                if (mLiveHistoryNumbers != null) {
+                    mLiveHistoryNumbers.postValue(Pair.create(historyNumbers,
+                            historyPredictionNumbers));
+                }
+                if (mLivePredictionNumbers != null) {
+                    mLivePredictionNumbers.postValue(predictionNumbers);
+                }
             }
         }
     }
@@ -651,6 +694,8 @@ public class ProcessingFragment extends Fragment {
         private final String mInput;
         /** File input URI. */
         private final Uri mFileUri;
+        /** File input stream. */
+        private final InputStream mFileStream;
 
         /**
          * Constructor for processing an input string.
@@ -659,15 +704,18 @@ public class ProcessingFragment extends Fragment {
         ProcessInputTask(final String input) {
             mInput = input;
             mFileUri = null;
+            mFileStream = null;
         }
 
         /**
          * Constructor for processing the input file pointed to by fileUri.
          * @param fileUri the URI of the file to be processed
+         * @param fileStream the file stream of the file to be processed
          */
-        ProcessInputTask(final Uri fileUri) {
+        ProcessInputTask(final Uri fileUri, final InputStream fileStream) {
             mInput = null;
             mFileUri = fileUri;
+            mFileStream = fileStream;
         }
 
         /**
@@ -676,6 +724,7 @@ public class ProcessingFragment extends Fragment {
         ProcessInputTask() {
             mInput = null;
             mFileUri = null;
+            mFileStream = null;
         }
 
         /**
@@ -692,25 +741,13 @@ public class ProcessingFragment extends Fragment {
                     processSocketInput();
                 }
             } catch (NumberFormatException e) {
-                // Call mListener for showing error message
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (mListener != null) {
-                            mListener.onInvalidInputNumber();
-                        }
-                    }
-                });
+                // Show error message in main activity
+                if (mLiveNotification != null) {
+                    mLiveNotification.postValue(
+                            new NotificationEvent(NotificationType.INVALID_INPUT_NUMBER));
+                }
             }
             finishInputProcessing();
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (mListener != null) {
-                        mListener.onProgressUpdate();
-                    }
-                }
-            });
         }
 
         /**
@@ -718,20 +755,12 @@ public class ProcessingFragment extends Fragment {
          */
         private void processFileInput() {
             mInputUri = mFileUri;
-            try {
-                Activity activity = getActivity();
-                if (activity == null) {
-                    throw new NullPointerException();
-                }
-                InputStream stream = activity.getContentResolver().openInputStream(mInputUri);
-                if (stream == null) {
-                    throw new NullPointerException();
-                }
-                mInputReader = new BufferedReader(new InputStreamReader(stream));
-            } catch (FileNotFoundException | NullPointerException e) {
+            if (mFileStream == null) {
                 abortFileInput();
                 return;
             }
+            postStatus(StatusType.FILE_INPUT);
+            mInputReader = new BufferedReader(new InputStreamReader(mFileStream));
             try {
                 while (mInputReader.ready() && mProcessingEnabled) {
                     String nextInput = mInputReader.readLine();
@@ -766,15 +795,11 @@ public class ProcessingFragment extends Fragment {
                     try {
                         processInputString(nextInput);
                     } catch (NumberFormatException e) {
-                        // Call mListener for showing error message
-                        mHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (mListener != null) {
-                                    mListener.onInvalidInputNumber();
-                                }
-                            }
-                        });
+                        // Show error message in main activity
+                        if (mLiveNotification != null) {
+                            mLiveNotification.postValue(
+                                    new NotificationEvent(NotificationType.INVALID_INPUT_NUMBER));
+                        }
                     }
                 }
                 mDisconnected.signal();
@@ -800,15 +825,11 @@ public class ProcessingFragment extends Fragment {
             if (mInputUri != null) {
                 mInputUri = null;
             }
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (mListener != null) {
-                        // Abort file input processing
-                        mListener.onFileInputAborted();
-                    }
-                }
-            });
+            setInputType(InputType.DIRECT_INPUT);
+            if (mLiveNotification != null) {
+                mLiveNotification.postValue(
+                        new NotificationEvent(NotificationType.FILE_INPUT_ABORTED));
+            }
         }
 
         /**
@@ -826,9 +847,12 @@ public class ProcessingFragment extends Fragment {
                         mNumberType);
                 historyNumbers.formatNumbers(inputNumberType);
                 mHistoryBuffer.clear();
+                mHistoryPredictionBuffer.clear();
+                int currentGeneratorIndex = mRandomManager.getCurrentGeneratorIndex();
+                mRandomManager.reset();
+                mRandomManager.setCurrentGeneratorIndex(currentGeneratorIndex);
                 mNumberType = inputNumberType;
                 inputNumbers = historyNumbers.concatenate(inputNumbers);
-                showClear();
             }
             processInputNumbers(inputNumbers);
         }
@@ -840,11 +864,9 @@ public class ProcessingFragment extends Fragment {
          * @param inputNumbers the number sequence to be processed
          */
         private void processInputNumbers(NumberSequence inputNumbers) {
-            NumberSequence historyPredictionNumbers;
             if (mAutoDetect) {
                 // Detect best generator and update all states
                 int bestGenerator = mRandomManager.detectGenerator(inputNumbers, mHistoryBuffer);
-                historyPredictionNumbers = mRandomManager.getIncomingPredictionNumbers();
                 if (bestGenerator != mRandomManager.getCurrentGeneratorIndex()) {
                     // Set generator and process complete history
                     mRandomManager.setCurrentGeneratorIndex(bestGenerator);
@@ -854,91 +876,60 @@ public class ProcessingFragment extends Fragment {
                     mRandomManager.findCurrentSequence(historyNumbers, null);
                     NumberSequence replacedNumbers = mRandomManager.getIncomingPredictionNumbers();
                     mRandomManager.findCurrentSequence(inputNumbers, mHistoryBuffer);
-                    historyPredictionNumbers = mRandomManager.getIncomingPredictionNumbers();
+                    mHistoryPredictionBuffer.clear();
+                    if (replacedNumbers != null){
+                        mHistoryPredictionBuffer.put(replacedNumbers.getInternalNumbers());
+                    }
                     // Post change to user interface
-                    showGeneratorChange(historyNumbers, replacedNumbers, bestGenerator);
+                    showGeneratorChange(bestGenerator);
                 }
             } else {
                 mRandomManager.findCurrentSequence(inputNumbers, mHistoryBuffer);
-                historyPredictionNumbers = mRandomManager.getIncomingPredictionNumbers();
             }
+            NumberSequence inputHistoryPredictionNumbers =
+                    mRandomManager.getIncomingPredictionNumbers();
             // Generate new prediction without updating the state
             NumberSequence predictionNumbers = mRandomManager.predict(mPredictionLength,
                     mNumberType);
             mHistoryBuffer.put(inputNumbers.getInternalNumbers());
-            // Post result to user interface
-            showInputUpdate(inputNumbers, historyPredictionNumbers, predictionNumbers);
-        }
-
-        /**
-         * Sends the instruction to clear to the processing mListener.
-         */
-        private void showClear() {
-            boolean posted = mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    // Clear all fields
-                    if (mListener != null) {
-                        mListener.onClear();
-                    } else {
-                        mMissingUpdate = true;
-                    }
-                }
-            });
-            if (!posted) {
-                mMissingUpdate = true;
+            if (inputHistoryPredictionNumbers != null) {
+                mHistoryPredictionBuffer.put(inputHistoryPredictionNumbers.getInternalNumbers());
             }
+            NumberSequence historyNumbers = new NumberSequence(mHistoryBuffer.toArray(),
+                    mNumberType);
+            NumberSequence historyPredictionNumbers = new NumberSequence(
+                    mHistoryPredictionBuffer.toArray(), mNumberType);
+
+            // Post result to user interface
+            showInputUpdate(historyNumbers, historyPredictionNumbers, predictionNumbers);
         }
 
         /**
-         * Sends the generator change to the processing mListener.
-         * @param historyNumbers the complete previous input
-         * @param replacedNumbers the complete previous prediction numbers
+         * Sends the generator change to the main activity.
          * @param bestGenerator index of the best generator
          */
-        private void showGeneratorChange(final NumberSequence historyNumbers,
-                                         final NumberSequence replacedNumbers,
-                                         final int bestGenerator) {
-            boolean posted = mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    // Append input numbers to history
-                    if (mListener != null) {
-                        mListener.onGeneratorChanged(bestGenerator);
-                        mListener.onHistoryPredictionReplaced(historyNumbers, replacedNumbers);
-                    } else {
-                        mMissingUpdate = true;
-                    }
-                }
-            });
-            if (!posted) {
-                mMissingUpdate = true;
+        private void showGeneratorChange(final int bestGenerator) {
+            if (mLiveGenerator != null) {
+                mLiveGenerator.postValue(bestGenerator);
             }
         }
 
         /**
-         * Sends the processing result to the processing mListener.
-         * @param inputNumbers the processed input numbers
-         * @param historyPredictionNumbers the prediction numbers corresponding to the input
+         * Sends the processing result to the main activity.
+         * @param historyNumbers the complete sequence of history numbers
+         * @param historyPredictionNumbers the complete sequence of history prediction numbers
          * @param predictionNumbers the predicted numbers
          */
-        private void showInputUpdate(final NumberSequence inputNumbers,
+        private void showInputUpdate(final NumberSequence historyNumbers,
                                      final NumberSequence historyPredictionNumbers,
                                      final NumberSequence predictionNumbers) {
-            boolean posted = mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    // Append input numbers to history
-                    if (mListener != null) {
-                        mListener.onHistoryChanged(inputNumbers, historyPredictionNumbers);
-                        mListener.onPredictionChanged(predictionNumbers);
-                    } else {
-                        mMissingUpdate = true;
-                    }
-                }
-            });
-            if (!posted) {
-                mMissingUpdate = true;
+            // Update live objects
+            if (mLiveHistoryNumbers != null) {
+                mLiveHistoryNumbers.postValue(Pair.create(historyNumbers,
+                        historyPredictionNumbers));
+            }
+            if (mLivePredictionNumbers != null) {
+                mLivePredictionNumbers.postValue(predictionNumbers);
             }
             writeSocketOutput(predictionNumbers);
         }
@@ -982,18 +973,8 @@ public class ProcessingFragment extends Fragment {
             } else {
                 predictionNumbers = null;
             }
-            boolean posted = mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (!mMissingUpdate && mListener != null) {
-                        mListener.onPredictionChanged(predictionNumbers);
-                    } else {
-                        mMissingUpdate = true;
-                    }
-                }
-            });
-            if (!posted) {
-                mMissingUpdate = true;
+            if (mLivePredictionNumbers != null) {
+                mLivePredictionNumbers.postValue(predictionNumbers);
             }
         }
     }
@@ -1016,15 +997,12 @@ public class ProcessingFragment extends Fragment {
                     return;
                 }
                 while (!Thread.currentThread().isInterrupted()) {
-                    String status;
                     if (mClientSocket == null || mClientSocket.isClosed()) {
                         try {
                             // Display information about the server socket
-                            status = getResources().getString(R.string.server_listening) + " " + mServerPort;
-                            postStatus(status);
+                            postStatus(StatusType.SERVER_LISTENING);
                             mClientSocket = mServerSocket.accept();
-                            status = getResources().getString(R.string.client_connected);
-                            postStatus(status);
+                            postStatus(StatusType.CLIENT_CONNECTED);
                             InputStream inputStream = mClientSocket.getInputStream();
                             mInputReader = new BufferedReader(new InputStreamReader(inputStream));
                             OutputStream outputStream = mClientSocket.getOutputStream();
@@ -1034,12 +1012,8 @@ public class ProcessingFragment extends Fragment {
                             closeClient();
                             continue;
                         }
-                        boolean posted = mHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                processInputSocket();
-                            }
-                        });
+                        boolean posted = mHandler.post(
+                                ProcessingViewModel.this::processInputSocket);
                         if (!posted) {
                             abortSocketInput();
                             return;
@@ -1048,8 +1022,7 @@ public class ProcessingFragment extends Fragment {
                     try {
                         mDisconnected.await();
                         closeClient();
-                        status = getResources().getString(R.string.client_disconnected);
-                        postStatus(status);
+                        postStatus(StatusType.CLIENT_DISCONNECTED);
                     } catch (InterruptedException e) {
                         break;
                     }
@@ -1061,33 +1034,15 @@ public class ProcessingFragment extends Fragment {
         }
 
         /**
-         * Posts the current socket status to the user interface thread.
-         * @param status the status message
-         */
-        private void postStatus(final String status) {
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (mListener != null) {
-                        mListener.onSocketStatusChanged(status);
-                    }
-                }
-            });
-        }
-
-        /**
          * Aborts socket input processing and updates the user interface.
          */
         private void abortSocketInput() {
             closeSockets();
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (mListener != null) {
-                        mListener.onSocketInputAborted();
-                    }
-                }
-            });
+            setInputType(InputType.DIRECT_INPUT);
+            if (mLiveNotification != null) {
+                mLiveNotification.postValue(
+                        new NotificationEvent(NotificationType.SOCKET_INPUT_ABORTED));
+            }
         }
     }
 }

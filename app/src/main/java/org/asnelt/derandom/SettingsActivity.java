@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2019 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@ package org.asnelt.derandom;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 
-import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
@@ -28,7 +29,6 @@ import androidx.preference.PreferenceFragmentCompat;
 
 import android.text.InputType;
 import android.view.MenuItem;
-import android.widget.EditText;
 import android.widget.Toast;
 
 /**
@@ -60,6 +60,14 @@ public class SettingsActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
+
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+
         mFragment = new SettingsFragment();
         getSupportFragmentManager()
                 .beginTransaction()
@@ -110,6 +118,9 @@ public class SettingsActivity extends AppCompatActivity
                 EditTextPreference numberPreference = (EditTextPreference) preference;
                 String numberString = numberPreference.getText();
                 try {
+                    if (numberString == null) {
+                        throw new NumberFormatException();
+                    }
                     int numberInteger = Integer.parseInt(numberString);
                     // Check that numbers fit into a single string
                     if (numberInteger > Integer.MAX_VALUE
@@ -222,34 +233,19 @@ public class SettingsActivity extends AppCompatActivity
             editTextPreference = getPreferenceManager().findPreference("pref_prediction_length");
             if (editTextPreference != null) {
                 editTextPreference.setOnBindEditTextListener(
-                        new EditTextPreference.OnBindEditTextListener() {
-                            @Override
-                            public void onBindEditText(@NonNull EditText editText) {
-                                editText.setInputType(InputType.TYPE_CLASS_NUMBER);
-                            }
-                        });
+                        editText -> editText.setInputType(InputType.TYPE_CLASS_NUMBER));
             }
 
             editTextPreference = getPreferenceManager().findPreference("pref_history_length");
             if (editTextPreference != null) {
                 editTextPreference.setOnBindEditTextListener(
-                        new EditTextPreference.OnBindEditTextListener() {
-                            @Override
-                            public void onBindEditText(@NonNull EditText editText) {
-                                editText.setInputType(InputType.TYPE_CLASS_NUMBER);
-                            }
-                        });
+                        editText -> editText.setInputType(InputType.TYPE_CLASS_NUMBER));
             }
 
             editTextPreference = getPreferenceManager().findPreference("pref_socket_port");
             if (editTextPreference != null) {
                 editTextPreference.setOnBindEditTextListener(
-                        new EditTextPreference.OnBindEditTextListener() {
-                            @Override
-                            public void onBindEditText(@NonNull EditText editText) {
-                                editText.setInputType(InputType.TYPE_CLASS_NUMBER);
-                            }
-                        });
+                        editText -> editText.setInputType(InputType.TYPE_CLASS_NUMBER));
             }
         }
     }

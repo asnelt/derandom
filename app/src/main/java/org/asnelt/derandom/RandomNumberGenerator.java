@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Arno Onken
+ * Copyright (C) 2015-2024 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,7 +131,8 @@ abstract class RandomNumberGenerator {
         if (number < 0) {
             throw new IllegalArgumentException();
         }
-        int requiredWordNumber = number * NumberSequence.getRequiredWordsPerNumber(numberType);
+        int requiredWordNumber = number * NumberSequence.getRequiredWordsPerNumber(numberType,
+                getWordSize());
         NumberSequence numberSequence = new NumberSequence(next(requiredWordNumber),
                 NumberSequence.NumberType.RAW);
         numberSequence.formatNumbers(numberType, getWordSize());
@@ -150,7 +151,8 @@ abstract class RandomNumberGenerator {
         if (number < 0) {
             throw new IllegalArgumentException();
         }
-        int requiredWordNumber = number * NumberSequence.getRequiredWordsPerNumber(numberType);
+        int requiredWordNumber = number * NumberSequence.getRequiredWordsPerNumber(numberType,
+                getWordSize());
         NumberSequence numberSequence = new NumberSequence(peekNext(requiredWordNumber),
                 NumberSequence.NumberType.RAW);
         numberSequence.formatNumbers(numberType, getWordSize());
@@ -162,16 +164,4 @@ abstract class RandomNumberGenerator {
      * @return the word size
      */
     protected abstract int getWordSize();
-
-    /**
-     * Returns the state of the generator.
-     * @return the current state
-     */
-    protected abstract long[] getState();
-
-    /**
-     * Sets the state of the generator.
-     * @param state the new state
-     */
-    protected abstract void setState(long[] state);
 }

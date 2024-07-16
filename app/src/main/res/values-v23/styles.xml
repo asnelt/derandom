@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2016 Arno Onken
+Copyright (C) 2016-2024 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ limitations under the License.
         Base application theme for API 23+. This theme completely replaces
         AppBaseTheme from res/values/styles.xml on API 23+ devices.
     -->
-    <style name="AppBaseTheme" parent="Theme.AppCompat">
+    <style name="AppBaseTheme" parent="Theme.AppCompat.NoActionBar">
         <!-- API 23 theme customizations can go here. -->
         <item name="android:colorBackgroundFloating">@color/window_background</item>
     </style>
