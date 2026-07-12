@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Copyright (C) 2015-2025 Arno Onken
+Copyright (C) 2015-2026 Arno Onken
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ limitations under the License.
     <string name="pref_prediction_length_summary_singular">Zahl wird vorhergesagt</string>
     <string name="pref_prediction_length_summary_plural">Zahlen werden vorhergesagt</string>
     <string name="pref_colored_past">Alte Vorhersagen einfärben</string>
-    <string name="pref_colored_past_summary">Richtige Vorhersagen in grün und falsche in rot einfärben</string>
+    <string name="pref_colored_past_summary">Richtige Vorhersagen in Grün und falsche in Rot einfärben</string>
     <string name="pref_history_length_summary_singular">Zahl im Verlauf behalten</string>
     <string name="pref_history_length_summary_plural">Zahlen im Verlauf behalten</string>
     <string name="pref_parameter_base">Basis der Parameteranzeige</string>

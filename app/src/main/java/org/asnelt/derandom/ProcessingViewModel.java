@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2025 Arno Onken
+ * Copyright (C) 2015-2026 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,9 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * This class implements a view model for the main activity, coordinating all processing tasks.
+ */
 public class ProcessingViewModel extends ViewModel {
     /** Random manager for generating predictions. */
     private final RandomManager mRandomManager;
@@ -287,8 +290,8 @@ public class ProcessingViewModel extends ViewModel {
     }
 
     /**
-     * Returns the object for signalling notifications to the main activity.
-     * @return the object for signalling notifications
+     * Returns the object for signaling notifications to the main activity.
+     * @return the object for signaling notifications
      */
     LiveData<NotificationEvent> getLiveNotification() {
         if (mLiveNotification == null) {
@@ -319,7 +322,7 @@ public class ProcessingViewModel extends ViewModel {
     }
 
     /**
-     * Returns human readable names of all generators.
+     * Returns human-readable names of all generators.
      * @return all generator names
      */
     String[] getGeneratorNames() {

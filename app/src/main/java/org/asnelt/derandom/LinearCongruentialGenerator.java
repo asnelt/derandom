@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2025 Arno Onken
+ * Copyright (C) 2015-2026 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,27 +25,27 @@ import java.util.List;
 class LinearCongruentialGenerator extends RandomNumberGenerator {
     /** Multiplier parameter. */
     private final long mMultiplier;
-    /** Human readable name of multiplier parameter. */
+    /** Human-readable name of multiplier parameter. */
     private static final String MULTIPLIER_NAME = "Multiplier";
     /** Increment parameter. */
     private final long mIncrement;
-    /** Human readable name of increment parameter. */
+    /** Human-readable name of increment parameter. */
     private static final String INCREMENT_NAME = "Increment";
     /** Modulus parameter. */
     private final long mModulus;
-    /** Human readable name of modulus parameter. */
+    /** Human-readable name of modulus parameter. */
     private static final String MODULUS_NAME = "Modulus";
-    /** Index of start bit for output. */
+    /** Index of the start bit for output. */
     private final int mBitRangeStart;
-    /** Human readable name of bit range start parameter. */
+    /** Human-readable name of bit range start parameter. */
     private static final String BIT_RANGE_START_NAME = "Bit range start";
-    /** Index of stop bit for output. */
+    /** Index of the stop bit for output. */
     private final int mBitRangeStop;
-    /** Human readable name of bit range stop parameter. */
+    /** Human-readable name of bit range stop parameter. */
     private static final String BIT_RANGE_STOP_NAME = "Bit range stop";
-    /** Human readable name of state. */
+    /** Human-readable name of state. */
     private static final String STATE_NAME = "State";
-    /** Human readable names of all free parameters. */
+    /** Human-readable names of all free parameters. */
     private static final String[] PARAMETER_NAMES = {
             MULTIPLIER_NAME, INCREMENT_NAME, MODULUS_NAME, BIT_RANGE_START_NAME,
             BIT_RANGE_STOP_NAME, STATE_NAME
@@ -124,7 +124,7 @@ class LinearCongruentialGenerator extends RandomNumberGenerator {
     }
 
     /**
-     * Returns human readable names of all parameters.
+     * Returns human-readable names of all parameters.
      * @return a string array of parameter names
      */
     @Override

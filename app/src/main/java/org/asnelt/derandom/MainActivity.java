@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2025 Arno Onken
+ * Copyright (C) 2015-2026 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,20 @@
 
 package org.asnelt.derandom;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
 import androidx.core.widget.NestedScrollView;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.PreferenceManager;
@@ -80,12 +83,14 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
     private Spinner mSpinnerGenerator;
     /** Progress circle for indicating busy status. */
     private ProgressBar mProgressBar;
-    /** ViewModel for doing generator related processing. */
+    /** View model for doing generator related processing. */
     private NestedScrollView mNestedScrollView;
-    /** Launcher for the file selector result. */
+    /** View model for coordinating processing tasks. */
     private ProcessingViewModel mProcessingViewModel;
-    /** Field for displaying the nested scroll view. */
+    /** Launcher for the file selector result. */
     private ActivityResultLauncher<Intent> mFileSelectorLauncher;
+    /** Launcher for requesting the local network permission. */
+    private ActivityResultLauncher<String> mRequestLocalNetworkPermissionLauncher;
 
     /**
      * Initializes this activity and eventually recovers its state.
@@ -203,6 +208,19 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
                     mProcessingViewModel.resetInputUri();
                     enableDirectInput();
                     onFileInputAborted();
+                });
+
+        // Set up request for local network permission launcher
+        mRequestLocalNetworkPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        startSocketInput();
+                    } else {
+                        // Abort socket input
+                        enableDirectInput();
+                        onSocketInputAborted();
+                    }
                 });
 
         // Called when the input type updates
@@ -387,10 +405,15 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
                     if (mProcessingViewModel.getInputUri() != null) {
                         mProcessingViewModel.resetInputUri();
                     }
-                    mProcessingViewModel.setInputType(ProcessingViewModel.InputType.SOCKET_INPUT);
-                    clearInput();
-                    disableDirectInput();
-                    mProcessingViewModel.startServerTask();
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN
+                            && ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.ACCESS_LOCAL_NETWORK)
+                            == PackageManager.PERMISSION_DENIED) {
+                        mRequestLocalNetworkPermissionLauncher.launch(
+                                Manifest.permission.ACCESS_LOCAL_NETWORK);
+                    } else {
+                        startSocketInput();
+                    }
                 }
             }
         }
@@ -654,5 +677,16 @@ public class MainActivity extends AppCompatActivity implements OnItemSelectedLis
         intent.setType(FILE_MIME_TYPE);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         mFileSelectorLauncher.launch(Intent.createChooser(intent, fileSelectorTitle));
+    }
+
+    /**
+     * Resets the input display and starts the local server for incoming TCP connections. Called
+     * when socket input is selected and the ACCESS_LOCAL_NETWORK permission is granted.
+     */
+    private void startSocketInput() {
+        mProcessingViewModel.setInputType(ProcessingViewModel.InputType.SOCKET_INPUT);
+        clearInput();
+        disableDirectInput();
+        mProcessingViewModel.startServerTask();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2025 Arno Onken
+ * Copyright (C) 2015-2026 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ package org.asnelt.derandom;
  * This abstract class implements a random number generator.
  */
 abstract class RandomNumberGenerator {
-    /** Human readable name of the generator. */
+    /** Human-readable name of the generator. */
     private final String mName;
     /** Flag that signifies whether the generator is compatible with the input so far. */
     private volatile boolean mActive;
@@ -35,7 +35,7 @@ abstract class RandomNumberGenerator {
     }
 
     /**
-     * Returns human readable names of all parameters.
+     * Returns human-readable names of all parameters.
      * @return string array of parameter names
      */
     public abstract String[] getParameterNames();

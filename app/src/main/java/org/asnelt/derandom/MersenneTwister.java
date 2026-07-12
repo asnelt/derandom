@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2025 Arno Onken
+ * Copyright (C) 2015-2026 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,55 +26,55 @@ import java.util.concurrent.atomic.AtomicLongArray;
 class MersenneTwister extends RandomNumberGenerator {
     /** Word size of the generator. */
     private final int mWordSize;
-    /** Human readable name of word size parameter. */
+    /** Human-readable name of word size parameter. */
     private static final String WORD_SIZE_NAME = "Word size";
-    /** Human readable name of state size parameter. */
+    /** Human-readable name of state size parameter. */
     private static final String STATE_SIZE_NAME = "State size";
     /** The shift size parameter. */
     private final int mShiftSize;
-    /** Human readable name of shift size parameter. */
+    /** Human-readable name of shift size parameter. */
     private static final String SHIFT_SIZE_NAME = "Shift size";
     /** The number of bits in the lower mask of the state twist transformation. */
     private final int mMaskBits;
-    /** Human readable name of mask bits parameter. */
+    /** Human-readable name of mask bits parameter. */
     private static final String MASK_BITS_NAME = "Mask bits";
     /** Bit mask for the state twist transformation. */
     private final long mTwistMask;
-    /** Human readable name of twist mask parameter. */
+    /** Human-readable name of twist mask parameter. */
     private static final String TWIST_MASK_NAME = "Twist mask";
     /** The u parameter of the tempering transformation. */
     private final int mTemperingU;
-    /** Human readable name of tempering u parameter. */
+    /** Human-readable name of tempering u parameter. */
     private static final String TEMPERING_U_NAME = "Tempering u";
     /** The d parameter of the tempering transformation. */
     private final long mTemperingD;
-    /** Human readable name of tempering d parameter. */
+    /** Human-readable name of tempering d parameter. */
     private static final String TEMPERING_D_NAME = "Tempering d";
     /** The s parameter of the tempering transformation. */
     private final int mTemperingS;
-    /** Human readable name of tempering s parameter. */
+    /** Human-readable name of tempering s parameter. */
     private static final String TEMPERING_S_NAME = "Tempering s";
     /** The b parameter of the tempering transformation. */
     private final long mTemperingB;
-    /** Human readable name of tempering b parameter. */
+    /** Human-readable name of tempering b parameter. */
     private static final String TEMPERING_B_NAME = "Tempering b";
     /** The t parameter of the tempering transformation. */
     private final int mTemperingT;
-    /** Human readable name of tempering t parameter. */
+    /** Human-readable name of tempering t parameter. */
     private static final String TEMPERING_T_NAME = "Tempering t";
     /** The c parameter of the tempering transformation. */
     private final long mTemperingC;
-    /** Human readable name of tempering c parameter. */
+    /** Human-readable name of tempering c parameter. */
     private static final String TEMPERING_C_NAME = "Tempering c";
     /** The l parameter of the tempering transformation. */
     private final int mTemperingL;
-    /** Human readable name of tempering l parameter. */
+    /** Human-readable name of tempering l parameter. */
     private static final String TEMPERING_L_NAME = "Tempering l";
     /** The multiplier parameter of the state initialization. */
     private final long mInitializationMultiplier;
-    /** Human readable name of initialization multiplier parameter. */
+    /** Human-readable name of initialization multiplier parameter. */
     private static final String INITIALIZATION_MULTIPLIER_NAME = "Initialization multiplier";
-    /** Human readable names of all free parameters. */
+    /** Human-readable names of all free parameters. */
     private static final String[] PARAMETER_NAMES = {
             WORD_SIZE_NAME, STATE_SIZE_NAME, SHIFT_SIZE_NAME, MASK_BITS_NAME, TWIST_MASK_NAME,
             TEMPERING_U_NAME, TEMPERING_D_NAME, TEMPERING_S_NAME, TEMPERING_B_NAME,
@@ -82,11 +82,11 @@ class MersenneTwister extends RandomNumberGenerator {
     };
     /** The parameter names as a list. */
     private static final List<String> PARAMETER_NAMES_LIST = Arrays.asList(PARAMETER_NAMES);
-    /** Human readable name of index. */
+    /** Human-readable name of index. */
     private static final String INDEX_NAME = "State index";
     /** Current state element index. */
     private volatile int mIndex;
-    /** Human readable name of state. */
+    /** Human-readable name of state. */
     private static final String STATE_NAME = "State";
     /** Internal state. */
     private final AtomicLongArray mState;
@@ -181,7 +181,7 @@ class MersenneTwister extends RandomNumberGenerator {
     }
 
     /**
-     * Returns human readable names of all parameters.
+     * Returns human-readable names of all parameters.
      * @return a string array of parameter names
      */
     @Override

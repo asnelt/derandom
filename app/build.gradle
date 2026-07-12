@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2025 Arno Onken
+ * Copyright (C) 2015-2026 Arno Onken
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,14 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId "org.asnelt.derandom"
-        versionCode 16
-        versionName "2.6"
+        versionCode 17
+        versionName "2.7"
         minSdk 21
-        targetSdk 36
-        return void
+        targetSdk 37
     }
 
     buildTypes {
@@ -34,8 +33,6 @@ android {
         }
     }
     namespace = 'org.asnelt.derandom'
-
-    return void
 }
 
 dependencies {
