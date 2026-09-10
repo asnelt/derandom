@@ -251,7 +251,7 @@ public class NumberSequence {
      * @throws IndexOutOfBoundsException if index is not a valid index of the sequence
      */
     long getInternalNumber(int index) throws IndexOutOfBoundsException {
-        if (index < 0 || index > mInternalNumbers.length) {
+        if (index < 0 || index >= mInternalNumbers.length) {
             throw new IndexOutOfBoundsException();
         }
         return mInternalNumbers[index];
