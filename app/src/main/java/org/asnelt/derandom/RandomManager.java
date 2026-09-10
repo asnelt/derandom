@@ -364,20 +364,23 @@ class RandomManager {
         int bestScore = 0;
         int bestGeneratorIndex = mCurrentGeneratorIndex;
         for (int i = 0; i < mGenerators.length(); i++) {
-            if (!mGenerators.get(i).isActive()) {
+            boolean active = mGenerators.get(i).isActive();
+            if (!active && i != mCurrentGeneratorIndex) {
                 continue;
             }
             prediction = mGenerators.get(i).findSequence(incomingNumbers, historyBuffer);
-            int score = prediction.countMatchesWith(incomingNumbers);
-            if (score > bestScore) {
-                bestScore = score;
-                bestGeneratorIndex = i;
-            }
-            if (i == mCurrentGeneratorIndex) {
-                if (score == bestScore) {
+            if (active) {
+                int score = prediction.countMatchesWith(incomingNumbers);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestGeneratorIndex = i;
+                }
+                if (i == mCurrentGeneratorIndex && score == bestScore) {
                     // For equal score current generator is the default generator
                     bestGeneratorIndex = mCurrentGeneratorIndex;
                 }
+            }
+            if (i == mCurrentGeneratorIndex) {
                 mIncomingPredictionNumbers = prediction;
             }
         }
