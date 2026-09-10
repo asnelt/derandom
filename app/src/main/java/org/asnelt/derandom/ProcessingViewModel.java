@@ -772,16 +772,17 @@ public class ProcessingViewModel extends ViewModel {
                     }
                     processInputString(nextInput);
                 }
-                mInputReader.close();
             } catch (IOException | NullPointerException e) {
                 abortFileInput();
             }
-            try {
-                mInputReader.close();
-            } catch (IOException e) {
-                // We do not need to do anything more with this mInputReader
+            if (mInputReader != null) {
+                try {
+                    mInputReader.close();
+                } catch (IOException e) {
+                    // We do not need to do anything more with this mInputReader
+                }
+                mInputReader = null;
             }
-            mInputReader = null;
         }
 
         /**
